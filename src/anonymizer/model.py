@@ -17,6 +17,64 @@ PROTECTED_GROUPS = frozenset({
 
 UNEDITABLE_GROUPS = DERIVED_GROUPS | PROTECTED_GROUPS
 
+# ExifTool reports MakerNote tags under a family-1 vendor group (Apple,
+# Canon, ...), but the block is only writable as a whole, under the
+# family-0 group MakerNotes. Deleting the sub-tags one by one silently
+# does nothing, so a plan has to collapse them into MakerNotes:all.
+MAKERNOTE_GROUPS = frozenset({
+    "Apple", "Canon", "Casio", "DJI", "FLIR", "FujiFilm", "GE", "GoPro",
+    "HP", "JVC", "Kodak", "Leica", "Minolta", "Motorola", "Nikon",
+    "Olympus", "Panasonic", "Pentax", "PhaseOne", "Reconyx", "Ricoh",
+    "Samsung", "Sanyo", "Sigma", "Sony", "MakerNotes", "MakerUnknown",
+})
+
+
+def groups_covered_by(key: str) -> frozenset[str] | None:
+    """Which family-1 groups a `Group:all` deletion actually removes.
+
+    Returns None when the key is not a group-wide deletion.
+    """
+    group, _, name = key.partition(":")
+    if name.lower() != "all":
+        return None
+    if group.lower() == "makernotes":
+        return MAKERNOTE_GROUPS
+    return frozenset({group})
+
+
+# Tags that ExifTool's AllDates shortcut moves as a unit.
+_ALL_DATES = ("DateTimeOriginal", "CreateDate", "ModifyDate")
+
+
+def _apply_shift(tags: dict[str, "Tag"], op: "EditOp") -> dict[str, "Tag"]:
+    """Model an ExifTool date shift (`-AllDates+=3:0:0 0`) in a pending state.
+
+    Shifting every date by the same amount is what keeps them coherent, so
+    the preview has to show the shifted values rather than the originals.
+    """
+    from datetime import datetime, timedelta
+
+    target = op.key.rstrip("+-")
+    sign = 1 if op.key.endswith("+") else -1
+    # ExifTool shift values are Y:M:D h:m:s, so days are the third field.
+    try:
+        days = int(str(op.value).split(" ")[0].split(":")[2])
+    except (ValueError, AttributeError, IndexError):
+        return tags
+    names = _ALL_DATES if target == "AllDates" else (target.partition(":")[2] or target,)
+
+    shifted = dict(tags)
+    for key, tag in tags.items():
+        if tag.name not in names:
+            continue
+        try:
+            dt = datetime.strptime(str(tag.value)[:19], "%Y:%m:%d %H:%M:%S")
+        except ValueError:
+            continue
+        moved = (dt + timedelta(days=sign * days)).strftime("%Y:%m:%d %H:%M:%S")
+        shifted[key] = replace(tag, value=moved, display=moved)
+    return shifted
+
 
 @dataclass(frozen=True)
 class Tag:
@@ -133,18 +191,19 @@ class TagSet:
         """
         tags = dict(self.tags)
         for op in plan.ops:
+            if op.key.endswith(("+", "-")) and not op.is_delete:
+                tags = _apply_shift(tags, op)
+                continue
             group, _, name = op.key.partition(":")
             if op.is_delete:
+                covered = groups_covered_by(op.key)
                 if op.key.lower() == "all":
                     tags = {
                         k: t for k, t in tags.items()
                         if t.group in UNEDITABLE_GROUPS
                     }
-                elif name.lower() == "all":
-                    tags = {
-                        k: t for k, t in tags.items()
-                        if t.group != group
-                    }
+                elif covered is not None:
+                    tags = {k: t for k, t in tags.items() if t.group not in covered}
                 else:
                     tags.pop(op.key, None)
             else:

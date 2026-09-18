@@ -27,45 +27,166 @@ def container_of(path: Path) -> str:
     return "unknown"
 
 
-def _digest_isobmff(fh, size: int) -> bytes:
-    """Concatenate every mdat box body.
+# HEIF item types that carry metadata rather than picture data.
+_METADATA_ITEM_TYPES = {"Exif", "mime", "uri "}
+
+
+def _walk_boxes(data: bytes, start: int, end: int):
+    """Yield (type, body_start, box_end) for each box in a range.
 
     Box size 1 means a 64-bit size follows the type; size 0 means the box
     extends to end of file. iPhone HEIC files use the 64-bit form.
     """
-    h = hashlib.sha256()
-    pos = 0
-    found = False
-    while pos + 8 <= size:
-        fh.seek(pos)
-        header = fh.read(8)
-        if len(header) < 8:
-            break
-        box_size = struct.unpack(">I", header[:4])[0]
-        box_type = header[4:8]
-        body_start = pos + 8
+    pos = start
+    while pos + 8 <= end:
+        box_size = struct.unpack(">I", data[pos:pos + 4])[0]
+        box_type = data[pos + 4:pos + 8]
+        body = pos + 8
         if box_size == 1:
-            ext = fh.read(8)
-            if len(ext) < 8:
-                break
-            box_size = struct.unpack(">Q", ext)[0]
-            body_start = pos + 16
+            if pos + 16 > end:
+                return
+            box_size = struct.unpack(">Q", data[pos + 8:pos + 16])[0]
+            body = pos + 16
         elif box_size == 0:
-            box_size = size - pos
+            box_size = end - pos
         if box_size < 8:
-            break
-        if box_type == b"mdat":
-            found = True
-            remaining = pos + box_size - body_start
-            fh.seek(body_start)
-            while remaining > 0:
-                block = fh.read(min(_CHUNK, remaining))
-                if not block:
-                    break
-                h.update(block)
-                remaining -= len(block)
+            return
+        yield box_type, body, min(pos + box_size, end)
         pos += box_size
+
+
+def _uint(data: bytes, offset: int, width: int) -> int:
+    if width == 0:
+        return 0
+    return int.from_bytes(data[offset:offset + width], "big")
+
+
+def _parse_iinf(data: bytes, body: int, end: int) -> dict[int, str]:
+    """item_ID -> item_type, from the item information box."""
+    version = data[body]
+    cursor = body + 4
+    if version == 0:
+        cursor += 2
+    else:
+        cursor += 4
+    items: dict[int, str] = {}
+    for box_type, ibody, iend in _walk_boxes(data, cursor, end):
+        if box_type != b"infe":
+            continue
+        infe_version = data[ibody]
+        p = ibody + 4
+        if infe_version >= 2:
+            id_width = 2 if infe_version == 2 else 4
+            item_id = _uint(data, p, id_width)
+            p += id_width + 2
+            items[item_id] = data[p:p + 4].decode("latin1")
+    return items
+
+
+def _parse_iloc(data: bytes, body: int) -> dict[int, list[tuple[int, int, int]]]:
+    """item_ID -> [(construction_method, offset, length), ...]."""
+    version = data[body]
+    p = body + 4
+    offset_size = data[p] >> 4
+    length_size = data[p] & 0xF
+    base_offset_size = data[p + 1] >> 4
+    index_size = data[p + 1] & 0xF if version in (1, 2) else 0
+    p += 2
+    if version < 2:
+        item_count = _uint(data, p, 2)
+        p += 2
+    else:
+        item_count = _uint(data, p, 4)
+        p += 4
+
+    out: dict[int, list[tuple[int, int, int]]] = {}
+    for _ in range(item_count):
+        if version < 2:
+            item_id = _uint(data, p, 2)
+            p += 2
+        else:
+            item_id = _uint(data, p, 4)
+            p += 4
+        construction = 0
+        if version in (1, 2):
+            construction = _uint(data, p, 2) & 0xF
+            p += 2
+        p += 2  # data_reference_index
+        base_offset = _uint(data, p, base_offset_size)
+        p += base_offset_size
+        extent_count = _uint(data, p, 2)
+        p += 2
+        extents = []
+        for _ in range(extent_count):
+            p += index_size
+            extent_offset = _uint(data, p, offset_size)
+            p += offset_size
+            extent_length = _uint(data, p, length_size)
+            p += length_size
+            extents.append((construction, base_offset + extent_offset, extent_length))
+        out[item_id] = extents
+    return out
+
+
+def _digest_heif_items(data: bytes) -> bytes:
+    """Hash the picture items' extents, located through iloc.
+
+    HEIC stores the Exif and XMP payloads inside mdat alongside the coded
+    image tiles, so hashing mdat wholesale reports a metadata edit as a
+    pixel change. Hashing the items that iloc marks as pictures isolates
+    the image data exactly.
+    """
+    meta_range = None
+    for box_type, body, end in _walk_boxes(data, 0, len(data)):
+        if box_type == b"meta":
+            meta_range = (body + 4, end)  # meta is a FullBox
+            break
+    if meta_range is None:
+        return b""
+
+    items: dict[int, str] = {}
+    locations: dict[int, list[tuple[int, int, int]]] = {}
+    idat_start = None
+    for box_type, body, end in _walk_boxes(data, *meta_range):
+        if box_type == b"iinf":
+            items = _parse_iinf(data, body, end)
+        elif box_type == b"iloc":
+            locations = _parse_iloc(data, body)
+        elif box_type == b"idat":
+            idat_start = body
+    if not items or not locations:
+        return b""
+
+    h = hashlib.sha256()
+    hashed = 0
+    for item_id in sorted(items):
+        if items[item_id] in _METADATA_ITEM_TYPES:
+            continue
+        for construction, offset, length in locations.get(item_id, ()):
+            if construction == 0:
+                start = offset
+            elif construction == 1 and idat_start is not None:
+                start = idat_start + offset
+            else:
+                continue
+            h.update(data[start:start + length])
+            hashed += 1
+    return h.digest() if hashed else b""
+
+
+def _digest_mdat(data: bytes) -> bytes:
+    """Concatenate every mdat body. Used for MOV/MP4, which have no iloc."""
+    h = hashlib.sha256()
+    found = False
+    for box_type, body, end in _walk_boxes(data, 0, len(data)):
+        if box_type == b"mdat":
+            h.update(data[body:end])
+            found = True
     return h.digest() if found else b""
+
+
+def _digest_isobmff(data: bytes) -> bytes:
+    return _digest_heif_items(data) or _digest_mdat(data)
 
 
 def _digest_jpeg(data: bytes) -> bytes:
@@ -168,12 +289,9 @@ def payload_digest(path: Path) -> str | None:
     kind = container_of(path)
     if kind == "unknown":
         return None
-    if kind == "isobmff":
-        with open(path, "rb") as fh:
-            digest = _digest_isobmff(fh, path.stat().st_size)
-        return digest.hex() if digest else None
     data = path.read_bytes()
     digest = {
+        "isobmff": _digest_isobmff,
         "jpeg": _digest_jpeg,
         "png": _digest_png,
         "tiff": _digest_tiff,

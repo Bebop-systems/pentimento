@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .inspect import read_tags
-from .model import EditPlan, TagSet
+from .model import EditPlan, TagSet, groups_covered_by
 from .payload import payload_digest
 
 # Tags whose change would alter how the file renders.
@@ -99,11 +99,11 @@ def _gate_regression(plan: EditPlan, after: TagSet) -> GateResult:
     """Confirm what the plan removed is gone from the written file."""
     survivors: list[str] = []
     for key in plan.deletions():
-        group, _, name = key.partition(":")
+        covered = groups_covered_by(key)
         if key.lower() == "all":
             survivors += [k for k, t in after.tags.items() if t.editable]
-        elif name.lower() == "all":
-            survivors += [k for k in after.keys() if k.split(":")[0] == group]
+        elif covered is not None:
+            survivors += [k for k, t in after.tags.items() if t.group in covered]
         elif after.get(key) is not None:
             survivors.append(key)
     if survivors:

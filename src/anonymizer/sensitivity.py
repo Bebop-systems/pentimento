@@ -32,6 +32,13 @@ RENDERING_CRITICAL = frozenset({
     "XResolution", "YResolution", "ResolutionUnit", "InteropIndex",
     "Gamma", "PrimaryChromaticities", "WhitePoint", "TransferFunction",
     "ExifVersion", "FlashpixVersion", "Compression", "EncodingProcess",
+    # The HDR gain map is picture data carried as XMP. Removing it changes
+    # how the photo renders on an HDR display.
+    "HDRGainMapVersion", "HDRGainMapHeadroom",
+    # Names the XMP spec version, not an editor. Every XMP-bearing camera
+    # file has one, ExifTool cannot remove it while any XMP packet remains,
+    # and a file missing it is more conspicuous than one that has it.
+    "XMPToolkit",
 })
 
 _EXACT: dict[str, Category] = {}
@@ -88,7 +95,7 @@ _register(
     "HistoryAction", "HistoryWhen", "HistoryChanged", "HistoryInstanceID",
     "DocumentID", "InstanceID", "OriginalDocumentID", "DerivedFromInstanceID",
     "DerivedFromDocumentID", "ApplicationRecordVersion", "OriginatingProgram",
-    "ProgramVersion", "Encoder", "WritingApp", "XMPToolkit",
+    "ProgramVersion", "Encoder", "WritingApp",
 )
 _register(
     Category.EMBEDDED,
