@@ -43,3 +43,12 @@ def test_newline_in_argument_is_rejected(engine):
 def test_error_surfaces(engine, tmp_path):
     with pytest.raises(ExifToolError):
         engine.read_json(tmp_path / "does-not-exist.jpg")
+
+
+def test_numeric_values_round_trip_without_print_conversion(engine, make_jpeg, tmp_path):
+    """Regression: without -n, ExifTool coerces 1 and 8 both to 3, silently."""
+    src = make_jpeg()
+    for value in ("1", "8"):
+        dst = tmp_path / f"o{value}.jpg"
+        engine.write(src, dst, [f"-EXIF:Orientation={value}"])
+        assert engine.read_json(dst, "-n")[0]["IFD0:Orientation"] == int(value)

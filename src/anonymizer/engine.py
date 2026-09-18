@@ -133,12 +133,19 @@ class ExifToolEngine:
         return json.loads(text)
 
     def write(self, src: Path, dst: Path, arg_lines: list[str]) -> ExifToolResult:
-        """Copy src to dst, then apply arg_lines to dst. src is never modified."""
+        """Copy src to dst, then apply arg_lines to dst. src is never modified.
+
+        `-n` is not optional. Without it ExifTool applies print conversion to
+        incoming values, and a value it cannot match in a tag's lookup table
+        is silently coerced rather than rejected: `-Orientation=1` and
+        `-Orientation=8` both land as 3, with nothing on stderr. Reads use
+        `-n` for machine values, so writes must too or the round trip lies.
+        """
         src, dst = Path(src), Path(dst)
         dst.parent.mkdir(parents=True, exist_ok=True)
         if src.resolve() != dst.resolve():
             shutil.copyfile(src, dst)
-        result = self.execute(*arg_lines, "-overwrite_original", str(dst))
+        result = self.execute("-n", *arg_lines, "-overwrite_original", str(dst))
         if result.errors:
             raise ExifToolError("; ".join(result.errors))
         return result

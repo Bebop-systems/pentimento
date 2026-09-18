@@ -3,10 +3,14 @@
 The JPEG builder produces a real, decodable 1x1 baseline file so tests
 exercise genuine container parsing rather than a stub.
 """
+from pathlib import Path
+
 import pytest
 
 from anonymizer.engine import ExifToolEngine
 from scripts.fetch_exiftool import find_exiftool
+
+SAMPLE_HEIC = Path(__file__).resolve().parent.parent / "IMG_0942.HEIC"
 
 MINIMAL_JPEG = bytes.fromhex(
     "ffd8"
@@ -32,6 +36,13 @@ def exiftool_path():
 def engine(exiftool_path):
     with ExifToolEngine(exiftool_path) as e:
         yield e
+
+
+@pytest.fixture(scope="session")
+def sample_heic():
+    if not SAMPLE_HEIC.exists():
+        pytest.skip("sample HEIC not present")
+    return SAMPLE_HEIC
 
 
 @pytest.fixture
