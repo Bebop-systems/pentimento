@@ -1,0 +1,28 @@
+# Vendored ExifTool binary (fetched by scripts/fetch_exiftool.py)
+vendor/
+
+# Sample photos carry real metadata (GPS, serials) - keep them out of history
+*.HEIC
+*.heic
+*.jpg
+*.jpeg
+*.png
+*.tiff
+*.mov
+*.mp4
+!web/**/*.png
+!tests/**/generated/*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime
+.anonymizer-sessions/
+*.log
