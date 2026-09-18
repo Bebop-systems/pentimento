@@ -1,0 +1,279 @@
+"""Local single-user web server.
+
+Binds loopback only. Nothing is uploaded anywhere: files live in a
+per-session temp directory that is removed when the process exits.
+"""
+from __future__ import annotations
+
+import atexit
+import io
+import mimetypes
+import shutil
+import tempfile
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from flask import Flask, Response, jsonify, request, send_file
+from werkzeug.utils import secure_filename
+
+from .apply import apply_plan
+from .engine import ExifToolEngine
+from .inspect import read_tags
+from .linter import lint
+from .model import EditPlan, TagSet
+from .payload import container_of
+from .presets import PRESETS, build_plan, plan_from_edits
+from .profiles import PROFILES
+from .sensitivity import RISK_ORDER, Category, classify
+
+WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
+
+# A browser will send whatever Host a malicious page names. Restricting it
+# to loopback stops DNS rebinding from reaching this server through a tab
+# the operator already has open.
+ALLOWED_HOSTS = {"127.0.0.1", "localhost", "[::1]", "testserver"}
+
+
+@dataclass
+class Session:
+    id: str
+    directory: Path
+    source: Path
+    tagset: TagSet
+    output: Path | None = None
+    gates: list = field(default_factory=list)
+
+
+class SessionStore:
+    def __init__(self):
+        self.root = Path(tempfile.mkdtemp(prefix="anonymizer-"))
+        self.sessions: dict[str, Session] = {}
+        atexit.register(self.cleanup)
+
+    def create(self, filename: str, data) -> Session:
+        session_id = uuid.uuid4().hex
+        directory = self.root / session_id
+        directory.mkdir(parents=True)
+        safe = secure_filename(filename) or "upload.bin"
+        source = directory / safe
+        try:
+            data.save(source)
+        finally:
+            # Werkzeug spools large uploads to a temp file and does not close
+            # it for us; leaving it open leaks a handle per upload.
+            data.close()
+        return Session(id=session_id, directory=directory, source=source, tagset=None)
+
+    def register(self, session: Session) -> None:
+        self.sessions[session.id] = session
+
+    def cleanup(self) -> None:
+        shutil.rmtree(self.root, ignore_errors=True)
+
+
+def _serve_asset(filename: str):
+    """Serve a file from web/ out of memory.
+
+    Flask's send_from_directory hands back an open file handle that is not
+    released until the response is collected. These assets are a few
+    kilobytes, so reading them is simpler than tracking the handle.
+    """
+    target = (WEB_DIR / filename).resolve()
+    if not target.is_file() or WEB_DIR.resolve() not in target.parents:
+        return jsonify({"error": "Not found"}), 404
+    mimetype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    return Response(target.read_bytes(), mimetype=mimetype)
+
+
+def _tag_payload(tagset: TagSet) -> list[dict]:
+    rows = []
+    for tag in tagset.tags.values():
+        rows.append({
+            "key": tag.key,
+            "group": tag.group,
+            "name": tag.name,
+            "value": "" if tag.value is None else str(tag.value),
+            "display": tag.display,
+            "category": str(classify(tag)),
+            "editable": tag.editable,
+        })
+    order = {c: i for i, c in enumerate(RISK_ORDER)}
+    rows.sort(key=lambda r: (order.get(Category(r["category"]), 9), r["key"]))
+    return rows
+
+
+def _findings_payload(tagset: TagSet) -> list[dict]:
+    return [
+        {"rule": f.rule, "severity": f.severity, "message": f.message}
+        for f in lint(tagset)
+    ]
+
+
+def _diff_payload(before: TagSet, after: TagSet) -> list[dict]:
+    rows = []
+    for key in sorted(before.keys() - after.keys()):
+        tag = before.tags[key]
+        if tag.editable:
+            rows.append({"key": key, "kind": "removed", "before": tag.display, "after": ""})
+    for key in sorted(before.keys() & after.keys()):
+        b, a = before.tags[key], after.tags[key]
+        if str(b.value) != str(a.value):
+            rows.append({"key": key, "kind": "changed",
+                         "before": b.display, "after": a.display})
+    for key in sorted(after.keys() - before.keys()):
+        rows.append({"key": key, "kind": "added", "before": "",
+                     "after": after.tags[key].display})
+    return rows
+
+
+def _build(session: Session, body: dict) -> EditPlan:
+    preset = body.get("preset") or "manual"
+    options = {
+        "profile": body.get("profile"),
+        "time_shift_days": body.get("time_shift_days") or 0,
+    }
+    plan = build_plan(session.tagset, preset, options)
+    edits = body.get("edits") or {}
+    if edits:
+        plan = plan.merged(plan_from_edits(edits))
+    return plan
+
+
+def create_app(engine: ExifToolEngine | None = None) -> Flask:
+    app = Flask(__name__, static_folder=None)
+    store = SessionStore()
+    app.config["STORE"] = store
+    app.config["ENGINE"] = engine
+
+    def get_engine() -> ExifToolEngine:
+        current = app.config.get("ENGINE")
+        if current is None:
+            from scripts.fetch_exiftool import ensure_exiftool
+            current = ExifToolEngine(ensure_exiftool()).start()
+            app.config["ENGINE"] = current
+        return current
+
+    @app.before_request
+    def enforce_loopback():
+        host = (request.host or "").rsplit(":", 1)[0]
+        if host not in ALLOWED_HOSTS:
+            return jsonify({"error": f"Refusing request for host {host!r}"}), 403
+
+    @app.get("/")
+    def index():
+        return _serve_asset("index.html")
+
+    @app.get("/static/<path:filename>")
+    def static_files(filename):
+        return _serve_asset(filename)
+
+    @app.get("/api/presets")
+    def presets():
+        return jsonify({
+            "presets": PRESETS,
+            "profiles": {k: p.label for k, p in PROFILES.items()},
+        })
+
+    @app.post("/api/upload")
+    def upload():
+        uploaded = request.files.get("file")
+        if uploaded is None or not uploaded.filename:
+            return jsonify({"error": "No file was provided"}), 400
+        session = store.create(uploaded.filename, uploaded)
+        try:
+            session.tagset = read_tags(get_engine(), session.source)
+        except Exception as exc:
+            shutil.rmtree(session.directory, ignore_errors=True)
+            return jsonify({"error": f"Could not read that file: {exc}"}), 400
+
+        # ExifTool happily reports File: tags for a text file. Requiring a
+        # picture or video MIME type keeps the editor honest about what it
+        # can actually verify.
+        mime = session.tagset.get("File:MIMEType")
+        kind = str(mime.value) if mime else ""
+        if not kind.startswith(("image/", "video/")):
+            shutil.rmtree(session.directory, ignore_errors=True)
+            return jsonify({
+                "error": f"That is a {kind or 'file of unknown type'}, "
+                         "not a photo or video."
+            }), 400
+        store.register(session)
+        return jsonify({
+            "session": session.id,
+            "filename": session.source.name,
+            "container": container_of(session.source),
+            "size": session.source.stat().st_size,
+            "tags": _tag_payload(session.tagset),
+            "findings": _findings_payload(session.tagset),
+        })
+
+    def _session_or_404(body):
+        session = store.sessions.get((body or {}).get("session", ""))
+        if session is None:
+            return None, (jsonify({"error": "Unknown session"}), 404)
+        return session, None
+
+    @app.post("/api/preview")
+    def preview():
+        body = request.get_json(silent=True) or {}
+        session, error = _session_or_404(body)
+        if error:
+            return error
+        try:
+            plan = _build(session, body)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        pending = session.tagset.with_plan(plan)
+        return jsonify({
+            "tags": _tag_payload(pending),
+            "findings": _findings_payload(pending),
+            "diff": _diff_payload(session.tagset, pending),
+            "args": plan.to_args(),
+        })
+
+    @app.post("/api/apply")
+    def apply_route():
+        body = request.get_json(silent=True) or {}
+        session, error = _session_or_404(body)
+        if error:
+            return error
+        try:
+            plan = _build(session, body)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        output = session.directory / f"anonymized_{session.source.name}"
+        try:
+            report = apply_plan(get_engine(), session.source, output, plan)
+        except Exception as exc:
+            return jsonify({"error": f"Write failed: {exc}"}), 500
+
+        session.output = report.output_path if report.ok else None
+        gates = [
+            {"name": g.name, "ok": g.ok, "detail": g.detail, "meaning": g.meaning}
+            for g in report.gates
+        ]
+        return jsonify({
+            "ok": report.ok,
+            "gates": gates,
+            "removed": report.removed,
+            "changed": report.changed,
+            "download": f"/api/download/{session.id}" if report.ok else None,
+        })
+
+    @app.get("/api/download/<session_id>")
+    def download(session_id):
+        session = store.sessions.get(session_id)
+        if session is None or session.output is None or not session.output.exists():
+            return jsonify({"error": "Nothing to download"}), 404
+        # Served from memory rather than by path: send_file would leave the
+        # handle open until the response is garbage collected.
+        return send_file(
+            io.BytesIO(session.output.read_bytes()),
+            as_attachment=True,
+            download_name=session.output.name,
+            mimetype="application/octet-stream",
+        )
+
+    return app

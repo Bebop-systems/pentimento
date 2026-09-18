@@ -76,6 +76,35 @@ def _apply_shift(tags: dict[str, "Tag"], op: "EditOp") -> dict[str, "Tag"]:
     return shifted
 
 
+def _prune_derived(
+    tags: dict[str, "Tag"], removed_names: set[str], removed_groups: set[str]
+) -> dict[str, "Tag"]:
+    """Drop Composite tags whose source tags were just deleted.
+
+    ExifTool computes Composite tags from stored ones, so removing GPS
+    silently removes Composite:GPSPosition too. Without this, a preview
+    shows coordinates surviving that the written file will not contain,
+    which is worse than showing nothing.
+    """
+    if not removed_names and not removed_groups:
+        return tags
+    survivors = {}
+    for key, tag in tags.items():
+        if tag.group != "Composite":
+            survivors[key] = tag
+            continue
+        name = tag.name
+        base = name[6:] if name.startswith("SubSec") else name
+        derived_from_removed = (
+            name in removed_names
+            or base in removed_names
+            or any(name.startswith(group) for group in removed_groups if group != "all")
+        )
+        if not derived_from_removed:
+            survivors[key] = tag
+    return survivors
+
+
 @dataclass(frozen=True)
 class Tag:
     group: str
@@ -190,6 +219,15 @@ class TagSet:
         everything that is not protected.
         """
         tags = dict(self.tags)
+        removed_names: set[str] = set()
+        removed_groups: set[str] = set()
+        for op in plan.ops:
+            if op.is_delete:
+                covered = groups_covered_by(op.key)
+                if covered is not None:
+                    removed_groups |= covered
+                else:
+                    removed_names.add(op.key.partition(":")[2] or op.key)
         for op in plan.ops:
             if op.key.endswith(("+", "-")) and not op.is_delete:
                 tags = _apply_shift(tags, op)
@@ -215,4 +253,5 @@ class TagSet:
                     tags[op.key] = replace(
                         existing, value=op.value, display=str(op.value)
                     )
+        tags = _prune_derived(tags, removed_names, removed_groups)
         return TagSet(path=self.path, tags=tags)
