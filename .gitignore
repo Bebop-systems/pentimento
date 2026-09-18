@@ -26,3 +26,8 @@ htmlcov/
 # Runtime
 .anonymizer-sessions/
 *.log
+
+# Playwright MCP scratch output
+.playwright-mcp/
+*.png
+!web/**/*.png

@@ -73,3 +73,17 @@ def test_with_plan_all_keeps_protected_groups():
     pending = ts.with_plan(EditPlan([EditOp("all", None)]))
     assert pending.get("EXIF:Model") is None
     assert pending.get("ICC-header:ProfileClass") is not None
+
+
+def test_assignment_updates_the_existing_tag_across_group_families():
+    """Writing -EXIF:Make updates IFD0:Make; it does not add a second tag.
+
+    Without this the preview shows the old value while the written file
+    gets the new one, and the linter then reasons about a file that will
+    never exist.
+    """
+    m = {"IFD0:Make": "Apple", "IFD0:Model": "iPhone 13 Pro Max"}
+    ts = TagSet.from_exiftool(Path("IMG_1.HEIC"), m, m)
+    pending = ts.with_plan(EditPlan([EditOp("EXIF:Make", "Google")]))
+    assert [k for k in pending.keys() if k.endswith(":Make")] == ["IFD0:Make"]
+    assert pending.by_name("Make").value == "Google"

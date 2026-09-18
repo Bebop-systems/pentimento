@@ -121,8 +121,10 @@ def test_manual_edits_are_applied(client, sample_heic):
         "session": session, "preset": "manual",
         "edits": {"EXIF:Model": "Pixel 8"},
     }).get_json()
-    assert any(d["key"] == "EXIF:Model" and d["after"] == "Pixel 8"
-               for d in data["diff"])
+    # The edit names EXIF:Model but resolves onto the tag ExifTool actually
+    # reports, IFD0:Model, exactly as the write will.
+    assert any(d["key"] == "IFD0:Model" and d["after"] == "Pixel 8"
+               and d["kind"] == "changed" for d in data["diff"])
 
 
 def test_reprofile_swaps_identity(client, sample_heic):
@@ -131,3 +133,20 @@ def test_reprofile_swaps_identity(client, sample_heic):
         "session": session, "preset": "reprofile", "profile": "pixel-8",
     }).get_json()
     assert any(d["after"] == "Pixel 8" for d in data["diff"])
+
+
+def test_apply_then_changing_preset_does_not_reuse_stale_output(client, sample_heic):
+    """A second apply must overwrite the first, not serve the earlier file."""
+    session = _upload(client, sample_heic).get_json()["session"]
+    first = client.post("/api/apply", json={
+        "session": session, "preset": "plausible"
+    }).get_json()
+    assert first["ok"]
+    before = client.get(first["download"]).data
+
+    second = client.post("/api/apply", json={
+        "session": session, "preset": "reprofile", "profile": "pixel-8",
+    }).get_json()
+    assert second["ok"]
+    after = client.get(second["download"]).data
+    assert before != after, "download still serves the superseded output"

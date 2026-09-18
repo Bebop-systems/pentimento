@@ -1,1 +1,96 @@
-<!doctype html><title>placeholder</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metadata Editor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f4e'/%3E%3Cpath d='M9 20.5 L23 11.5 M9 11.5 L23 20.5' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Metadata Editor</h1>
+  </div>
+  <div class="bar-meta">
+    <span id="file-label" class="muted">No file loaded</span>
+    <span class="pill pill-local" title="No network requests are made. Files stay in a temp folder that is deleted when you close the server.">local only</span>
+  </div>
+</header>
+
+<main>
+
+  <section id="drop" class="drop">
+    <input type="file" id="file-input" hidden
+           accept="image/*,video/*,.heic,.heif,.dng,.cr2,.nef,.arw">
+    <div class="drop-inner">
+      <svg viewBox="0 0 24 24" class="drop-icon" aria-hidden="true">
+        <path d="M12 16V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <p class="drop-title">Drop a photo or video here</p>
+      <p class="muted">or <button type="button" id="browse" class="linkbtn">choose a file</button></p>
+      <p class="muted small">Your original is never modified. You get a new file.</p>
+    </div>
+  </section>
+
+  <section id="workspace" hidden>
+
+    <div class="controls">
+      <div class="control">
+        <label for="preset">Preset</label>
+        <select id="preset"></select>
+        <p id="preset-help" class="muted small"></p>
+      </div>
+      <div class="control" id="profile-control" hidden>
+        <label for="profile">Camera identity</label>
+        <select id="profile"></select>
+        <p class="muted small">Every field is written to agree with the others.</p>
+      </div>
+      <div class="control">
+        <label for="shift">Shift dates (days)</label>
+        <input type="number" id="shift" value="0" step="1">
+        <p class="muted small">All timestamps move together, so their order survives.</p>
+      </div>
+      <div class="control control-action">
+        <button id="apply" class="primary">Write clean copy</button>
+        <p class="muted small">Verified before you can download it.</p>
+      </div>
+    </div>
+
+    <div id="gates" class="gates" hidden></div>
+
+    <div class="columns">
+      <div class="col-main">
+        <div class="col-head">
+          <h2>Metadata</h2>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div id="tags" class="tags"></div>
+      </div>
+
+      <aside class="col-side">
+        <section class="panel">
+          <h2>Consistency</h2>
+          <p class="muted small">Contradictions a careful inspector would notice.</p>
+          <div id="findings"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Pending changes</h2>
+          <div id="diff"></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

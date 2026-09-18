@@ -132,3 +132,14 @@ def test_warnings_sort_before_notes():
     ts = _ts(name="IMG_1.HEIC", IFD0__Make="Canon", GPS__GPSLatitude=1.0)
     severities = [f.severity for f in lint(ts)]
     assert severities == sorted(severities, key=lambda s: s != "warning")
+
+
+def test_reprofiling_to_another_vendor_flags_the_filename():
+    """An IMG_*.HEIC claiming Google is the tell the linter exists to catch."""
+    from anonymizer.model import EditOp, EditPlan
+    m = {"IFD0:Make": "Apple", "IFD0:Model": "iPhone 13 Pro Max"}
+    ts = TagSet.from_exiftool(Path("IMG_0942.HEIC"), m, m)
+    pending = ts.with_plan(EditPlan([
+        EditOp("EXIF:Make", "Google"), EditOp("EXIF:Model", "Pixel 8"),
+    ]))
+    assert "filename_mismatch" in _rules(pending)

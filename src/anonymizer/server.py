@@ -112,10 +112,28 @@ def _findings_payload(tagset: TagSet) -> list[dict]:
 
 def _diff_payload(before: TagSet, after: TagSet) -> list[dict]:
     rows = []
-    for key in sorted(before.keys() - after.keys()):
-        tag = before.tags[key]
-        if tag.editable:
-            rows.append({"key": key, "kind": "removed", "before": tag.display, "after": ""})
+
+    # A MakerNote scrub removes dozens of vendor tags at once. Listing each
+    # one buries the handful of changes the operator actually chose, so
+    # large same-group removals collapse into a single line.
+    removed = [before.tags[k] for k in sorted(before.keys() - after.keys())
+               if before.tags[k].editable]
+    by_group: dict[str, list] = {}
+    for tag in removed:
+        by_group.setdefault(tag.group, []).append(tag)
+
+    for group, tags in by_group.items():
+        if len(tags) > 5:
+            rows.append({
+                "key": f"{group}: {len(tags)} tags",
+                "kind": "removed",
+                "before": ", ".join(t.name for t in tags[:4]) + ", ...",
+                "after": "",
+            })
+        else:
+            for tag in tags:
+                rows.append({"key": tag.key, "kind": "removed",
+                             "before": tag.display, "after": ""})
     for key in sorted(before.keys() & after.keys()):
         b, a = before.tags[key], after.tags[key]
         if str(b.value) != str(a.value):

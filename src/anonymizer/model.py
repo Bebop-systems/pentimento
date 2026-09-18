@@ -245,12 +245,24 @@ class TagSet:
                 else:
                     tags.pop(op.key, None)
             else:
-                existing = tags.get(op.key)
+                target = op.key
+                if target not in tags:
+                    # An assignment names a family-0 group (EXIF:Make) while
+                    # ExifTool reports the tag under a family-1 group
+                    # (IFD0:Make). They are the same tag, and a write updates
+                    # it rather than adding a second one, so the preview has
+                    # to resolve by name or it will disagree with the output.
+                    target = next(
+                        (k for k, t in tags.items()
+                         if t.name == name and t.editable),
+                        op.key,
+                    )
+                existing = tags.get(target)
                 if existing is None:
-                    tags[op.key] = Tag(group or "EXIF", name or group,
+                    tags[target] = Tag(group or "EXIF", name or group,
                                        op.value, str(op.value))
                 else:
-                    tags[op.key] = replace(
+                    tags[target] = replace(
                         existing, value=op.value, display=str(op.value)
                     )
         tags = _prune_derived(tags, removed_names, removed_groups)
