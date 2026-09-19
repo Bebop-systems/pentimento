@@ -18,6 +18,10 @@ const state = {
   tags: [],
   selected: null,     // which category the detail table is showing
   revealed: false,    // whether sealed values are shown
+  pattern: "",        // output filename pattern
+  collision: "overwrite",
+  patternTouched: false,  // once edited by hand, stop auto-filling it
+  patterns: {},       // per-profile naming conventions
 };
 
 const CATEGORY_LABEL = {
@@ -79,6 +83,26 @@ async function loadPresets() {
   $("preset-help").textContent = data.presets[state.preset];
 
   state.profiles = data.profiles;
+  state.patterns = data.patterns;
+  state.defaultPattern = data.default_pattern;
+  if (!state.pattern) state.pattern = data.default_pattern;
+  state.collision = data.default_collision;
+
+  $("pattern").value = state.pattern;
+
+  const collision = $("collision");
+  collision.innerHTML = "";
+  for (const [key, label] of Object.entries(data.collision_modes)) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = label;
+    collision.append(option);
+  }
+  collision.value = state.collision;
+
+  $("pattern-help").textContent =
+    "Tokens: " + Object.keys(data.tokens).map((k) => `{${k}}`).join("  ") +
+    ". A pattern containing {n} numbers itself, so it never overwrites.";
 
   const profile = $("profile");
   profile.innerHTML = "";
@@ -100,6 +124,29 @@ async function loadPresets() {
   }
   profile.value = state.profile;
   renderProfileNote();
+}
+
+/* The filename a camera would use is part of being that camera, so the
+ * pattern follows the chosen identity until the operator edits it. */
+function applyProfilePattern() {
+  if (state.patternTouched) return;
+  const wanted = state.preset === "reprofile"
+    ? (state.patterns[state.profile] || state.defaultPattern)
+    : state.defaultPattern;
+  if (wanted && wanted !== state.pattern) {
+    state.pattern = wanted;
+    $("pattern").value = wanted;
+  }
+}
+
+function renderOutputName(name, error) {
+  $("output-preview").textContent = error ? "check the pattern" : name || "";
+  $("pattern-error").textContent = error || "";
+  $("pattern-error").hidden = !error;
+  $("collision").disabled = /\{n[:}]/.test(state.pattern);
+  $("collision").title = $("collision").disabled
+    ? "A pattern with {n} picks the next free number, so nothing is overwritten."
+    : "";
 }
 
 function renderProfileNote() {
@@ -200,8 +247,12 @@ function renderTags(tags) {
     meta ? `${CATEGORY_LABEL[meta.key]} — ${rows.length} field${rows.length === 1 ? "" : "s"}`
          : "Details";
   $("detail-summary").textContent = meta ? meta.summary : "";
-  $("reveal-all").textContent = state.revealed ? "Hide values" : "Reveal values";
-  $("reveal-all").hidden = !rows.some((r) => r.sealed);
+  const anySealed = rows.some((r) => r.sealed);
+  const revealButton = $("reveal-all");
+  revealButton.textContent = state.revealed ? "Hide values" : "Reveal values";
+  revealButton.setAttribute("aria-pressed", String(state.revealed));
+  revealButton.hidden = !anySealed;
+  $("sealed-note").hidden = !anySealed || state.revealed;
 
   if (!rows.length) {
     container.innerHTML = `<p class="empty">Nothing left in this group.</p>`;
@@ -233,12 +284,7 @@ function renderRow(tag) {
   value.className = "tagvalue";
   const shown = tag.display || tag.value || "(empty)";
   if (tag.sealed && !state.revealed) {
-    const veil = document.createElement("span");
-    veil.className = "veil";
-    veil.textContent = shown;
-    veil.title = "Click to reveal";
-    veil.onclick = () => veil.classList.toggle("open");
-    value.append(veil);
+    value.append(buildVeil(tag, shown));
   } else {
     value.textContent = shown;
   }
@@ -285,6 +331,46 @@ function renderRow(tag) {
 
   row.append(left, actions, what);
   return row;
+}
+
+/* A concealed value.
+ *
+ * Blur is only a visual defence, so on its own it protects a sighted
+ * person and nobody else: a screen reader would read the coordinates
+ * straight out. This is a real button, reachable by keyboard, carrying
+ * its state in aria-expanded, and the value is hidden from assistive
+ * technology until it is deliberately revealed.
+ */
+function buildVeil(tag, shown) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "veil";
+  button.setAttribute("aria-expanded", "false");
+
+  const text = document.createElement("span");
+  text.className = "veil-text";
+  text.textContent = shown;
+  text.setAttribute("aria-hidden", "true");
+
+  const label = document.createElement("span");
+  label.className = "sr";
+
+  const describe = (open) => {
+    label.textContent = open
+      ? `${tag.name}: sensitive value now shown. Activate to hide it again.`
+      : `${tag.name}: sensitive value hidden. Activate to reveal it.`;
+  };
+  describe(false);
+
+  button.append(text, label);
+  button.onclick = () => {
+    const open = button.getAttribute("aria-expanded") === "true";
+    button.setAttribute("aria-expanded", String(!open));
+    button.classList.toggle("open", !open);
+    text.setAttribute("aria-hidden", String(open));
+    describe(!open);
+  };
+  return button;
 }
 
 function startEdit(tag, valueCell, row) {
@@ -390,8 +476,12 @@ function renderGates(result) {
   for (const gate of result.gates) {
     const chip = document.createElement("span");
     chip.className = `trust ${gate.ok ? "on" : "attn"}`;
-    chip.innerHTML = `<span class="dot"></span>`;
-    chip.append(document.createTextNode(gate.name));
+    const chipDot = document.createElement("span");
+    chipDot.className = "dot";
+    const chipState = document.createElement("span");
+    chipState.className = "sr";
+    chipState.textContent = gate.ok ? " passed: " : " FAILED: ";
+    chip.append(chipDot, document.createTextNode(gate.name), chipState);
     chip.title = gate.meaning;
     trustrow.append(chip);
   }
@@ -409,6 +499,10 @@ function renderGates(result) {
     const name = document.createElement("div");
     name.className = "gate-name";
     name.textContent = gate.name;
+    const state_ = document.createElement("span");
+    state_.className = "sr";
+    state_.textContent = gate.ok ? " passed." : " failed.";
+    name.append(state_);
     const meaning = document.createElement("div");
     meaning.className = "gate-meaning";
     meaning.textContent = gate.meaning;
@@ -474,6 +568,8 @@ function requestBody() {
     profile: state.profile,
     time_shift_days: state.shift,
     edits: state.edits,
+    pattern: state.pattern,
+    on_collision: state.collision,
   };
 }
 
@@ -492,6 +588,7 @@ async function refresh() {
     renderTags(data.tags);
     renderFindings(data.findings);
     renderDiff(data.diff);
+    renderOutputName(data.output_name, data.naming_error);
     $("plan-note").textContent = data.diff.length
       ? `${data.diff.length} change(s) staged`
       : "nothing staged yet";
@@ -595,11 +692,26 @@ function wire() {
     $("preset-help").textContent = state.presets[state.preset] || "";
     $("profile-control").hidden = state.preset !== "reprofile";
     renderProfileNote();
+    applyProfilePattern();
     refresh();
   };
   $("profile").onchange = (e) => {
     state.profile = e.target.value;
     renderProfileNote();
+    applyProfilePattern();
+    refresh();
+  };
+
+  $("pattern").oninput = (e) => {
+    state.pattern = e.target.value;
+    state.patternTouched = true;
+    refresh();
+  };
+  $("collision").onchange = (e) => { state.collision = e.target.value; refresh(); };
+  $("pattern-reset").onclick = () => {
+    state.patternTouched = false;
+    applyProfilePattern();
+    $("pattern").value = state.pattern;
     refresh();
   };
   $("shift").onchange = (e) => {

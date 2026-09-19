@@ -46,7 +46,7 @@
     <span class="end" id="file-label">no file loaded</span>
   </div>
 
-  <div class="msg err" id="error" hidden></div>
+  <div class="msg err" id="error" role="alert" hidden></div>
 
   <main id="main">
 
@@ -92,7 +92,29 @@
         <p class="hint" id="profile-note" hidden></p>
       </section>
 
-      <section class="panel engraved-top" id="gates" hidden></section>
+      <details class="panel" id="output-panel">
+        <summary>Output file <span class="note" id="output-preview"></span></summary>
+        <div class="row">
+          <div class="grow">
+            <label for="pattern">Filename pattern</label>
+            <input type="text" id="pattern" spellcheck="false"
+                   aria-describedby="pattern-help">
+          </div>
+          <div class="narrow">
+            <label for="collision">If it already exists</label>
+            <select id="collision"></select>
+          </div>
+          <div class="go">
+            <label for="pattern-reset">&nbsp;</label>
+            <button type="button" id="pattern-reset">Use camera default</button>
+          </div>
+        </div>
+        <p class="hint" id="pattern-help"></p>
+        <p class="msg err" id="pattern-error" role="alert" hidden></p>
+      </details>
+
+      <section class="panel engraved-top" id="gates" hidden
+               aria-live="polite"></section>
 
       <div class="cols">
         <div class="col-main">
@@ -106,10 +128,15 @@
             <h2>
               <span id="detail-title">Details</span>
               <span class="right">
-                <button type="button" class="link" id="reveal-all">Reveal values</button>
+                <button type="button" class="link" id="reveal-all"
+                        aria-pressed="false">Reveal values</button>
               </span>
             </h2>
             <p class="hint mt0" id="detail-summary"></p>
+            <p class="hint mt0" id="sealed-note" hidden>
+              Identifying values are hidden until you ask for them. Activate
+              one to reveal it, or use Reveal values above.
+            </p>
             <div id="tags"></div>
           </section>
 
@@ -138,7 +165,7 @@
   </p>
 </div>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="/static/app.js"></script>
 </body>
