@@ -23,6 +23,10 @@ python run.py 8731                   # or pick the port yourself
 python run.py --no-browser
 ```
 
+Run it from your own terminal and leave that window open. The server
+lives for as long as the shell that started it, so starting it from
+somebody else's session ends when that session does.
+
 ## Where your cleaned file goes
 
 Every verified copy is written to `output/` next to this README, named after
