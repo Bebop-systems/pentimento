@@ -29,10 +29,27 @@ somebody else's session ends when that session does.
 
 ## Where your cleaned file goes
 
-Every verified copy is written to `output/` next to this README, named after
-the original with `_clean` appended, and the full path is shown on screen
-with a **Copy path** button. Nothing is ever overwritten: a second run of
-the same file becomes `_clean_2`.
+Every verified copy is written to `output/` next to this README, and the
+full path is shown on screen with a **Copy path** button.
+
+The default name is `{stem}_clean{ext}` and it **overwrites**, so repeating
+a file does not leave a pile of numbered copies. The Output panel controls
+this:
+
+| Token | Becomes |
+|---|---|
+| `{stem}` `{ext}` | the original name and extension |
+| `{preset}` `{profile}` | what you applied |
+| `{date}` `{time}` `{datetime}` | when you wrote it |
+| `{n}` | the lowest sequence number not already used |
+
+Format specs work, so `{n:03}` gives `001`. **If it already exists** offers
+Overwrite, Add a number, or Add the time — and a pattern containing `{n}`
+picks the next free number, so it never overwrites and that choice is
+disabled.
+
+Choosing a camera identity fills in that camera's own convention until you
+edit the field yourself.
 
 A browser download is offered too, but the file on disk is the reliable
 one. Browser downloads can land somewhere you will not find, or be
@@ -75,19 +92,29 @@ a pixel change.
 **Reprofile** adopts a different camera identity, and the picker is grouped
 into two kinds.
 
-**Plausible** — iPhone 15 Pro, iPhone 13, Pixel 8, Galaxy S23. Every field
-agrees with every other, so the file reads as an ordinary photo.
+**Plausible** (11) — iPhone 15 Pro and 13, Pixel 8, Galaxy S23, Canon EOS
+R5, Nikon Z 6II, Sony a7 IV, Fujifilm X100V, GoPro HERO12, DJI Mavic 3, and
+an Epson flatbed scan. Every field agrees with every other, so the file
+reads as an ordinary photo.
 
-**Novelty** — Game Boy Camera, a 1949 toaster, a dream you had once, a
-potato, an oatmeal-tin pinhole, and the Hubble Space Telescope. These are
-absurd about *which* camera they claim and rigorous about everything else:
-the numeric fields stay real numbers, so the output still passes all four
-gates and still opens everywhere.
+**Novelty** (13) — Game Boy Camera, a 1949 toaster, a dream you had once, a
+potato, an oatmeal-tin pinhole, an 1839 daguerreotype, the first webcam, a
+trail cam, the Perseverance rover, Voyager 1, an Etch A Sketch, a camera
+obscura, and Hubble. These are absurd about *which* camera they claim and
+rigorous about everything else: the numeric fields stay real numbers, so the
+output still passes all four gates and still opens everywhere.
 
-Several are more real than they sound. The Game Boy Camera genuinely used a
-Mitsubishi M64282FP sensor at 128x128 and f/2.0. A pinhole genuinely works
-out to about f/180. Hubble genuinely is 57.6 metres at f/24. Each one
-explains itself under the picker.
+Most are more real than they sound, and each says which part under the
+picker. The Game Boy Camera did use a Mitsubishi M64282FP at 128x128 and
+f/2.0. A pinhole really works out near f/180. Mastcam-Z really is an f/7 to
+f/9.5 zoom on Mars. Voyager 1 really carried a 1500mm f/8.5 vidicon tube and
+about 70 kilobytes of memory. The daguerreotype's ten-minute exposure is why
+nobody smiles in early photographs.
+
+Each identity also brings its camera's own filename convention, which is the
+point rather than decoration: `IMG_0942` announces Apple as loudly as the
+Make tag does, so a Pixel file keeping that name contradicts itself and the
+linter says so.
 
 The consistency panel *will* flag a novelty identity, and that is correct:
 claiming a Game Boy took your `IMG_0942.HEIC` is meant to be obviously
@@ -120,6 +147,12 @@ undifferentiated list.
 Values in the identifying categories start blurred and reveal on click, or
 all at once with **Reveal values**. Your own coordinates should not be on
 screen by accident during a screen share.
+
+Blur alone would protect a sighted person and nobody else, so each concealed
+value is a real button: reachable by keyboard, carrying its state in
+`aria-expanded`, and hidden from assistive technology until deliberately
+revealed. Its accessible name says what is concealed and what activating it
+will do. Gate results carry pass and fail in text as well as colour.
 
 ## The consistency linter
 

@@ -55,10 +55,34 @@ def test_credible_profiles_are_not_marked_novelty(key):
     assert PROFILES[key].novelty is False
 
 
-def test_lens_text_mentions_its_own_f_number():
-    """A lens description contradicting its own FNumber is the exact
-    inconsistency the linter hunts, so the source data must not contain one."""
-    for key, profile in PROFILES.items():
-        match = re.search(r"f/(\d+(?:\.\d+)?)", profile.lens_model)
-        if match:
-            assert float(match.group(1)) == float(profile.f_number), key
+def _range_from(text: str, pattern: str) -> tuple[float, float] | None:
+    """The low and high of a quoted figure, which may be a single value.
+
+    Zoom lenses genuinely quote ranges - 26-110mm, f/7-f/9.5 - so a
+    profile's own number has to fall inside its description rather than
+    equal the first figure in it.
+    """
+    found = [float(m) for m in re.findall(pattern, text)]
+    return (min(found), max(found)) if found else None
+
+
+@pytest.mark.parametrize("key", sorted(PROFILES))
+def test_f_number_agrees_with_the_lens_description(key):
+    """A lens contradicting its own aperture is the exact inconsistency the
+    linter hunts, so the source data must not contain one."""
+    profile = PROFILES[key]
+    quoted = _range_from(profile.lens_model, r"f/(\d+(?:\.\d+)?)")
+    if quoted is None:
+        return
+    low, high = quoted
+    assert low <= float(profile.f_number) <= high, (
+        f"{key}: FNumber {profile.f_number} is outside {profile.lens_model!r}"
+    )
+
+
+# There is deliberately no matching focal-length check. "mm" in a lens
+# description does not reliably mean focal length: DJI writes the 35mm
+# equivalent (24mm) while FocalLength holds the true 12.29mm, exactly as a
+# real Mavic file does, and the pinhole's 0.3mm is its aperture diameter.
+# A test that had to special-case those would stop meaning anything.
+# "f/N", by contrast, is unambiguous, which is why the check above stands.
