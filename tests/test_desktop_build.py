@@ -271,6 +271,28 @@ def test_selftest_reports_what_a_bundle_can_break():
     assert code == 0, report["problems"]
 
 
+def _png_pixels(png: bytes) -> bytes:
+    """Decoded scanlines, so a comparison survives a different zlib.
+
+    Comparing compressed bytes was the first attempt and it failed in CI:
+    zlib output differs between versions, so identical pixels produced
+    different files on Python 3.13 and 3.14.
+    """
+    import struct
+    import zlib
+
+    body = png[8:]
+    idat = b""
+    offset = 0
+    while offset < len(body):
+        length = struct.unpack(">I", body[offset:offset + 4])[0]
+        kind = body[offset + 4:offset + 8]
+        if kind == b"IDAT":
+            idat += body[offset + 8:offset + 8 + length]
+        offset += 12 + length
+    return zlib.decompress(idat)
+
+
 def test_the_committed_icons_carry_the_current_version():
     """They were generated stamped, committed stamped, and then rebuilt
     unstamped by every build, so the numbers never reached a release."""
@@ -289,10 +311,13 @@ def test_the_committed_icons_carry_the_current_version():
         pixels = width or 256
         if pixels < 64:
             continue
-        entry = data[offset:offset + size]
-        assert entry == render(pixels, __version__), (
+        entry = _png_pixels(data[offset:offset + size])
+        assert entry == _png_pixels(render(pixels, __version__)), (
             f"the {pixels}px icon is not stamped {__version__} - run "
             f"python desktop/make_icon.py"
+        )
+        assert entry != _png_pixels(render(pixels, "")), (
+            f"the {pixels}px icon carries no version stamp at all"
         )
         checked += 1
     assert checked, "no icon large enough to carry a stamp was checked"
