@@ -11,9 +11,30 @@ away is the 27 MB of Python runtime, pythonnet and Flask around it.
 | Window, WebView2, embedded UI | working |
 | Custom protocol instead of HTTP | working — no listening socket at all |
 | Job object child guard | ported |
-| ExifTool engine | not yet |
+| Tag model and edit plans | ported, tested |
+| SHA-256 | written out, NIST vectors pass |
+| Payload digest, all four containers | **byte-identical to Python** |
+| ExifTool engine | ported, not yet exercised |
 | Four gates | not yet |
 | Presets, profiles, linter, naming | not yet |
+
+## Parity
+
+The payload digest is the number where a silent difference between the
+two implementations would be worst: wrong either way, it blocks every
+legitimate edit or passes one that damaged the picture. Both agree on
+the real sample and on every container:
+
+```
+IMG_0942.HEIC   e2b49da1bf5576736f7cd40b0a9a65e5...   identical
+cleaned outputs e2b49da1bf5576736f7cd40b0a9a65e5...   identical
+JPEG            0a9a1c39ad97701fd8cf...              identical
+PNG             a6e905a26ae2db6f6ab3...              identical
+unknown         unverified                            identical
+```
+
+`--digest <path>` on a debug build prints it, which is how the comparison
+is run.
 
 ## Measured so far
 

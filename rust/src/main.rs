@@ -6,10 +6,16 @@
 //! function call. The interface markup does not change, and there is no
 //! socket for anything to connect to.
 
+// Windowed in release so no console flashes behind the application.
+// `cargo run` in debug keeps a console, which is where --digest is used.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod assets;
 mod childguard;
+mod engine;
+mod model;
+mod payload;
+mod sha256;
 
 use std::borrow::Cow;
 
@@ -49,7 +55,30 @@ fn respond(request: Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> {
         .unwrap()
 }
 
+/// A hidden entry point used to prove the port agrees with the Python
+/// implementation. The payload digest is the one number where a silent
+/// difference would be catastrophic, so it is comparable from a shell.
+fn digest_mode() -> bool {
+    let args: Vec<String> = std::env::args().collect();
+    let Some(position) = args.iter().position(|a| a == "--digest") else {
+        return false;
+    };
+    match args.get(position + 1) {
+        Some(path) => {
+            match payload::digest_file(std::path::Path::new(path)) {
+                Some(hex) => println!("{hex}"),
+                None => println!("unverified"),
+            }
+        }
+        None => eprintln!("--digest needs a path"),
+    }
+    true
+}
+
 fn main() -> wry::Result<()> {
+    if digest_mode() {
+        return Ok(());
+    }
     let event_loop = EventLoopBuilder::new().build();
     let window = WindowBuilder::new()
         .with_title(format!("Pentimento {VERSION}"))
