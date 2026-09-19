@@ -52,3 +52,63 @@ def test_numeric_values_round_trip_without_print_conversion(engine, make_jpeg, t
         dst = tmp_path / f"o{value}.jpg"
         engine.write(src, dst, [f"-EXIF:Orientation={value}"])
         assert engine.read_json(dst, "-n")[0]["IFD0:Orientation"] == int(value)
+
+
+def test_concurrent_commands_do_not_interleave(exiftool_path):
+    """Flask serves requests on threads and they share one ExifTool process.
+
+    Without a lock the commands interleave on a single stdin and each thread
+    reads whichever sentinel arrives first, which hangs the server. This
+    fails with a deadlock or a wrong answer if the lock is removed.
+    """
+    import concurrent.futures
+
+    from anonymizer.engine import ExifToolEngine
+
+    with ExifToolEngine(exiftool_path) as engine:
+        def ask(_):
+            return engine.execute("-ver").stdout.strip()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(ask, range(40)))
+
+    assert results == ["13.59"] * 40
+
+
+def test_concurrent_reads_return_their_own_file(exiftool_path, tmp_path):
+    """Each thread must get its own file's metadata, not another's."""
+    import concurrent.futures
+
+    from anonymizer.engine import ExifToolEngine
+    from tests.conftest import MINIMAL_JPEG
+
+    with ExifToolEngine(exiftool_path) as engine:
+        paths = []
+        for index in range(12):
+            path = tmp_path / f"cam{index}.jpg"
+            path.write_bytes(MINIMAL_JPEG)
+            engine.write(path, path, [f"-EXIF:Model=CAM{index}"])
+            paths.append((index, path))
+
+        def read(item):
+            index, path = item
+            return index, engine.read_json(path)[0]["IFD0:Model"]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            results = dict(pool.map(read, paths))
+
+    assert results == {index: f"CAM{index}" for index in range(12)}
+
+
+def test_engine_restarts_after_the_process_is_killed(exiftool_path):
+    """A dead ExifTool must not break every later request."""
+    from anonymizer.engine import ExifToolEngine
+
+    with ExifToolEngine(exiftool_path) as engine:
+        assert engine.execute("-ver").stdout.strip() == "13.59"
+
+        engine._proc.kill()
+        engine._proc.wait(timeout=5)
+
+        assert engine.execute("-ver").stdout.strip() == "13.59"
+        assert engine.restarts == 1

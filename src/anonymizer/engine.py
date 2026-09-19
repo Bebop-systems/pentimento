@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,6 +49,12 @@ class ExifToolEngine:
         self.exiftool_path = Path(exiftool_path)
         self._proc: subprocess.Popen | None = None
         self._seq = 0
+        # One process, many request threads. Flask's server is threaded by
+        # default, and two overlapping commands on a single stay_open
+        # process interleave their stdin writes and read each other's
+        # stdout. The result is a hang, which looks like the server dying.
+        self._lock = threading.RLock()
+        self.restarts = 0
 
     def start(self) -> "ExifToolEngine":
         if self._proc is not None:
@@ -63,26 +70,57 @@ class ExifToolEngine:
         )
         return self
 
-    def stop(self) -> None:
+    @staticmethod
+    def _close_pipes(proc: subprocess.Popen) -> None:
+        # Popen does not close pipes for us unless it was used as a context
+        # manager; leaving them open leaks file descriptors.
+        for stream in (proc.stdin, proc.stdout, proc.stderr):
+            if stream is not None:
+                try:
+                    stream.close()
+                except OSError:
+                    pass
+
+    def _discard(self) -> None:
+        """Drop a process that is dead or no longer trustworthy."""
         if self._proc is None:
             return
         proc, self._proc = self._proc, None
-        try:
-            proc.stdin.write("-stay_open\nFalse\n")
-            proc.stdin.flush()
-            proc.wait(timeout=10)
-        except (OSError, ValueError, subprocess.TimeoutExpired):
+        if proc.poll() is None:
             proc.kill()
-            proc.wait(timeout=5)
-        finally:
-            # Popen does not close pipes for us unless it was used as a
-            # context manager; leaving them open leaks file descriptors.
-            for stream in (proc.stdin, proc.stdout, proc.stderr):
-                if stream is not None:
-                    try:
-                        stream.close()
-                    except OSError:
-                        pass
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        self._close_pipes(proc)
+
+    def _ensure_running(self) -> None:
+        """Restart after a crash rather than failing every later request.
+
+        ExifTool can be killed by the OS or die on a malformed file. Without
+        this, one bad moment would leave the whole session broken until the
+        server was restarted.
+        """
+        if self._proc is not None and self._proc.poll() is not None:
+            self._discard()
+            self.restarts += 1
+        if self._proc is None:
+            self.start()
+
+    def stop(self) -> None:
+        with self._lock:
+            if self._proc is None:
+                return
+            proc, self._proc = self._proc, None
+            try:
+                proc.stdin.write("-stay_open\nFalse\n")
+                proc.stdin.flush()
+                proc.wait(timeout=10)
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                proc.kill()
+                proc.wait(timeout=5)
+            finally:
+                self._close_pipes(proc)
 
     def __enter__(self):
         return self.start()
@@ -107,21 +145,30 @@ class ExifToolEngine:
         Because arguments are newline-delimited rather than shell-parsed, a
         tag value that looks like an option is still only ever a value.
         """
-        if self._proc is None:
-            self.start()
-        self._seq += 1
-        seq = self._seq
-        lines = [*args, "-echo4", f"{{readyerr{seq}}}", f"-execute{seq}"]
-        for line in lines:
+        for line in args:
             if "\n" in line or "\r" in line:
                 raise ExifToolError(f"Argument contains a newline: {line!r}")
-        self._proc.stdin.write("\n".join(lines) + "\n")
-        self._proc.stdin.flush()
-        # Drain stdout first: a large JSON payload can fill the pipe buffer
-        # and deadlock if we block on stderr while stdout goes unread.
-        stdout = self._read_until(self._proc.stdout, f"{{ready{seq}}}")
-        stderr = self._read_until(self._proc.stderr, f"{{readyerr{seq}}}")
-        return ExifToolResult(stdout, stderr)
+
+        # Held for the whole exchange, not just the write: the sentinel that
+        # ends this command must be read by the thread that issued it.
+        with self._lock:
+            self._ensure_running()
+            self._seq += 1
+            seq = self._seq
+            lines = [*args, "-echo4", f"{{readyerr{seq}}}", f"-execute{seq}"]
+            try:
+                self._proc.stdin.write("\n".join(lines) + "\n")
+                self._proc.stdin.flush()
+                # Drain stdout first: a large JSON payload can fill the pipe
+                # buffer and deadlock a reader blocked on stderr.
+                stdout = self._read_until(self._proc.stdout, f"{{ready{seq}}}")
+                stderr = self._read_until(self._proc.stderr, f"{{readyerr{seq}}}")
+            except (ExifToolError, OSError, ValueError):
+                # The stream is out of step with the protocol now, so the
+                # process cannot be reused. The next call starts a fresh one.
+                self._discard()
+                raise
+            return ExifToolResult(stdout, stderr)
 
     def read_json(self, path: Path, *extra: str) -> list[dict]:
         result = self.execute("-j", "-G1", "-a", "-u", "-struct", *extra, str(path))
