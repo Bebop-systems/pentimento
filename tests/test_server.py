@@ -7,8 +7,10 @@ from anonymizer.server import create_app
 
 
 @pytest.fixture
-def client(engine):
-    app = create_app(engine)
+def client(engine, tmp_path):
+    # Output goes to a temp folder: the suite must never write into the
+    # operator's real output/ directory.
+    app = create_app(engine, output_dir=tmp_path / "out")
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
@@ -150,3 +152,53 @@ def test_apply_then_changing_preset_does_not_reuse_stale_output(client, sample_h
     assert second["ok"]
     after = client.get(second["download"]).data
     assert before != after, "download still serves the superseded output"
+
+
+def test_tags_carry_plain_english_explanations(client, sample_heic):
+    data = _upload(client, sample_heic).get_json()
+    assert all(t["what"] and t["reveals"] for t in data["tags"])
+    gps = next(t for t in data["tags"] if t["name"] == "GPSLatitude")
+    assert "latitude" in gps["what"].lower()
+
+
+def test_sensitive_values_are_sealed_by_default(client, sample_heic):
+    data = _upload(client, sample_heic).get_json()
+    gps = next(t for t in data["tags"] if t["name"] == "GPSLatitude")
+    assert gps["sealed"] is True
+    technical = next(t for t in data["tags"] if t["category"] == "benign")
+    assert technical["sealed"] is False
+
+
+def test_categories_summarise_the_file(client, sample_heic):
+    data = _upload(client, sample_heic).get_json()
+    by_key = {c["key"]: c for c in data["categories"]}
+    assert by_key["location"]["count"] > 0
+    assert by_key["location"]["summary"]
+    # Riskiest first, so the overview leads with what matters.
+    assert data["categories"][0]["key"] == "location"
+
+
+def test_apply_saves_to_a_findable_path(client, sample_heic):
+    session = _upload(client, sample_heic).get_json()["session"]
+    result = client.post("/api/apply", json={
+        "session": session, "preset": "plausible"
+    }).get_json()
+    assert result["ok"]
+    from pathlib import Path
+    saved = Path(result["saved_path"])
+    assert saved.is_file()
+    assert saved.stat().st_size > 0
+    assert result["saved_name"].endswith(".HEIC")
+
+
+def test_repeated_writes_do_not_overwrite_each_other(client, sample_heic):
+    from pathlib import Path
+    session = _upload(client, sample_heic).get_json()["session"]
+    paths = []
+    for _ in range(2):
+        result = client.post("/api/apply", json={
+            "session": session, "preset": "plausible"
+        }).get_json()
+        paths.append(Path(result["saved_path"]))
+    assert paths[0] != paths[1]
+    assert all(p.is_file() for p in paths)

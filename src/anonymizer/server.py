@@ -19,6 +19,7 @@ from werkzeug.utils import secure_filename
 
 from .apply import apply_plan
 from .engine import ExifToolEngine
+from .explanations import CATEGORY_SUMMARY, explain
 from .inspect import read_tags
 from .linter import lint
 from .model import EditPlan, TagSet
@@ -27,7 +28,14 @@ from .presets import PRESETS, build_plan, plan_from_edits
 from .profiles import PROFILES
 from .sensitivity import RISK_ORDER, Category, classify
 
-WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+WEB_DIR = PROJECT_ROOT / "web"
+
+# Verified output is written here as well as offered as a download. A browser
+# download can land somewhere the operator cannot find, or be swallowed
+# entirely by a security policy; a path on disk they can read off the screen
+# always works.
+OUTPUT_DIR = PROJECT_ROOT / "output"
 
 # A browser will send whatever Host a malicious page names. Restricting it
 # to loopback stops DNS rebinding from reaching this server through a tab
@@ -72,6 +80,17 @@ class SessionStore:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
+def _unique_name(out_dir: Path, source_name: str) -> str:
+    """A fresh filename in the output folder, never overwriting an earlier run."""
+    stem, suffix = Path(source_name).stem, Path(source_name).suffix
+    candidate = f"{stem}_clean{suffix}"
+    counter = 2
+    while (out_dir / candidate).exists():
+        candidate = f"{stem}_clean_{counter}{suffix}"
+        counter += 1
+    return candidate
+
+
 def _serve_asset(filename: str):
     """Serve a file from web/ out of memory.
 
@@ -86,21 +105,48 @@ def _serve_asset(filename: str):
     return Response(target.read_bytes(), mimetype=mimetype)
 
 
+# Categories whose values are worth hiding until the operator asks. Showing
+# your own coordinates unprompted defeats the point during a screen share.
+_SEALED_CATEGORIES = {Category.LOCATION, Category.DEVICE, Category.CONTENT}
+
+
 def _tag_payload(tagset: TagSet) -> list[dict]:
     rows = []
     for tag in tagset.tags.values():
+        category = classify(tag)
+        explanation = explain(tag)
         rows.append({
             "key": tag.key,
             "group": tag.group,
             "name": tag.name,
             "value": "" if tag.value is None else str(tag.value),
             "display": tag.display,
-            "category": str(classify(tag)),
+            "category": str(category),
             "editable": tag.editable,
+            "what": explanation.what,
+            "reveals": explanation.reveals,
+            "sealed": category in _SEALED_CATEGORIES and bool(tag.display),
         })
     order = {c: i for i, c in enumerate(RISK_ORDER)}
     rows.sort(key=lambda r: (order.get(Category(r["category"]), 9), r["key"]))
     return rows
+
+
+def _category_payload(tagset: TagSet) -> list[dict]:
+    """Counts and a one-line summary per category, for the overview cards."""
+    counts: dict[Category, int] = {}
+    for tag in tagset.tags.values():
+        category = classify(tag)
+        counts[category] = counts.get(category, 0) + 1
+    return [
+        {
+            "key": str(category),
+            "count": counts[category],
+            "summary": CATEGORY_SUMMARY[category],
+        }
+        for category in RISK_ORDER
+        if counts.get(category)
+    ]
 
 
 def _findings_payload(tagset: TagSet) -> list[dict]:
@@ -158,11 +204,17 @@ def _build(session: Session, body: dict) -> EditPlan:
     return plan
 
 
-def create_app(engine: ExifToolEngine | None = None) -> Flask:
+def create_app(
+    engine: ExifToolEngine | None = None,
+    output_dir: Path | None = None,
+) -> Flask:
     app = Flask(__name__, static_folder=None)
     store = SessionStore()
     app.config["STORE"] = store
     app.config["ENGINE"] = engine
+    # Injectable so the test suite never writes into the operator's real
+    # output folder.
+    app.config["OUTPUT_DIR"] = Path(output_dir) if output_dir else OUTPUT_DIR
 
     def get_engine() -> ExifToolEngine:
         current = app.config.get("ENGINE")
@@ -223,6 +275,7 @@ def create_app(engine: ExifToolEngine | None = None) -> Flask:
             "container": container_of(session.source),
             "size": session.source.stat().st_size,
             "tags": _tag_payload(session.tagset),
+            "categories": _category_payload(session.tagset),
             "findings": _findings_payload(session.tagset),
         })
 
@@ -245,6 +298,7 @@ def create_app(engine: ExifToolEngine | None = None) -> Flask:
         pending = session.tagset.with_plan(plan)
         return jsonify({
             "tags": _tag_payload(pending),
+            "categories": _category_payload(pending),
             "findings": _findings_payload(pending),
             "diff": _diff_payload(session.tagset, pending),
             "args": plan.to_args(),
@@ -261,7 +315,9 @@ def create_app(engine: ExifToolEngine | None = None) -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
-        output = session.directory / f"anonymized_{session.source.name}"
+        out_dir = app.config["OUTPUT_DIR"]
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output = out_dir / _unique_name(out_dir, session.source.name)
         try:
             report = apply_plan(get_engine(), session.source, output, plan)
         except Exception as exc:
@@ -278,6 +334,8 @@ def create_app(engine: ExifToolEngine | None = None) -> Flask:
             "removed": report.removed,
             "changed": report.changed,
             "download": f"/api/download/{session.id}" if report.ok else None,
+            "saved_path": str(output) if report.ok else None,
+            "saved_name": output.name if report.ok else None,
         })
 
     @app.get("/api/download/<session_id>")
