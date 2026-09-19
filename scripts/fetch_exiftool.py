@@ -49,21 +49,48 @@ def _fetch(url: str) -> bytes:
         return response.read()
 
 
-# Directories in the generic distribution that are not needed to run
-# ExifTool. `t/` is its own test suite, and it is not merely dead weight:
-# t/images holds deliberately malformed files, including a Mach-O with no
-# load commands. PyInstaller recognises the magic number, tries to process
-# it as a real binary, and fails the entire macOS build.
-_PRUNE = ("t", "html")
+# Directories not needed to run ExifTool. `t/` is its own test suite, and
+# it is not merely dead weight: t/images holds deliberately malformed
+# files, including a Mach-O with no load commands. PyInstaller recognises
+# the magic number, tries to process it as a real binary, and fails the
+# entire macOS build.
+_PRUNE_DIRS = ("t", "html")
+
+# Optional payloads ExifTool ships and this application never asks for.
+# Together they are about ten megabytes of the bundle.
+_PRUNE_FILES = (
+    # The built-in city database, used only by -geolocation.
+    "lib/Image/ExifTool/Geolocation.dat",
+    "lib/Image/ExifTool/Geolocation.pm",
+    # 2 MB of tag documentation in POD form.
+    "lib/Image/ExifTool/TagNames.pod",
+)
+
+# Tag descriptions translated into other languages. The interface is
+# English and reads machine values, not localised ones.
+_PRUNE_GLOBS = ("lib/Image/ExifTool/Lang/*.pm",)
 
 
 def _prune(root: Path) -> int:
+    """Strip what is never used at runtime. Returns files removed."""
     removed = 0
-    for name in _PRUNE:
+    for name in _PRUNE_DIRS:
         target = root / name
         if target.is_dir():
-            removed += sum(1 for _ in target.rglob("*") if _.is_file())
+            removed += sum(1 for f in target.rglob("*") if f.is_file())
             shutil.rmtree(target, ignore_errors=True)
+
+    for relative in _PRUNE_FILES:
+        target = root / relative
+        if target.is_file():
+            target.unlink()
+            removed += 1
+
+    for pattern in _PRUNE_GLOBS:
+        for target in root.glob(pattern):
+            if target.is_file() and target.name != "en.pm":
+                target.unlink()
+                removed += 1
     return removed
 
 
@@ -94,6 +121,15 @@ def download() -> Path:
     # keypress on exit. Renaming disables that.
     for k_exe in VENDOR_DIR.rglob("exiftool(-k).exe"):
         k_exe.rename(k_exe.with_name("exiftool.exe"))
+
+    # Both layouts get pruned: the Windows build keeps its library under
+    # exiftool_files, the generic one at the top level.
+    for candidate in VENDOR_DIR.glob("*"):
+        if candidate.is_dir():
+            _prune(candidate)
+            nested = candidate / "exiftool_files"
+            if nested.is_dir():
+                _prune(nested)
 
     binary = find_exiftool()
     if binary is None:

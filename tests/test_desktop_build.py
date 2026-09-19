@@ -204,3 +204,30 @@ def test_the_process_identifies_its_version():
     main = (PROJECT_ROOT / "src" / "pentimento" / "__main__.py").read_text(
         encoding="utf-8")
     assert "WINDOW_TITLE = f\"Pentimento {__version__}\"" in main
+
+
+def test_the_build_excludes_what_it_never_imports():
+    """14 MB of cryptography and OpenSSL were being swept up from whatever
+    else happened to be installed on the build machine, which also meant a
+    local build and a CI build could differ."""
+    spec = SPEC.read_text(encoding="utf-8")
+    for unused in ("cryptography", "OpenSSL", "cffi"):
+        assert f'"{unused}"' in spec
+
+
+def test_hoisted_vendor_libraries_are_deduplicated():
+    """PyInstaller copies Perl's DLLs beside the executable as well as
+    leaving them in vendor/. ExifTool loads them from its own folder, so
+    the top-level pair was 4.6 MB of exact duplicate."""
+    spec = SPEC.read_text(encoding="utf-8")
+    assert "_drop_hoisted_vendor_libraries" in spec
+    # Both copies arrive in binaries, which is the bug the first attempt had.
+    assert "list(binaries) + list(datas)" in spec
+
+
+def test_exiftool_optional_payloads_are_pruned():
+    import scripts.fetch_exiftool as fx
+
+    assert "lib/Image/ExifTool/Geolocation.dat" in fx._PRUNE_FILES
+    assert "lib/Image/ExifTool/TagNames.pod" in fx._PRUNE_FILES
+    assert any("Lang" in g for g in fx._PRUNE_GLOBS)

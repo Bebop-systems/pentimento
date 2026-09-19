@@ -6,6 +6,7 @@
 <title>Metadata Editor</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23110F0D'/%3E%3Cpath d='M16 5 L26 21 L6 21 Z M16 5 L16 21 M6 21 L26 21' fill='none' stroke='%237DB9F2' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/geodzk.css">
+<link rel="stylesheet" href="/static/geodzk-eink.css">
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
@@ -34,9 +35,8 @@
     <span class="spacer"></span>
     <label for="file-input" class="headerbtn" id="change-file" hidden
            title="Pick another photo or video">Load another</label>
-    <button type="button" id="theme" class="link" title="Switch theme">
-      <span id="theme-label">Dark</span>
-    </button>
+    <label for="theme" class="sr">Appearance</label>
+    <select id="theme" class="themepick" title="Appearance"></select>
   </header>
 
   <div class="scopebar">

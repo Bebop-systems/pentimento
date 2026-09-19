@@ -97,8 +97,20 @@ Filename: "{app}\{#AppExe}"; Description: "Start {#AppName}"; \
     Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
+; Inno removes every file it installed, but the 150-odd nested directories
+; under _internal were left behind empty - and because {app} was then not
+; empty, it could not remove itself or the folder either. The result was a
+; skeleton tree that a later install happily moved back into.
+;
+; Everything here is scoped to {app}, which differs per version, so
+; removing one side-by-side install cannot touch the other.
+Type: filesandordirs; Name: "{app}\_internal"
+Type: files; Name: "{app}\*.txt"
+Type: dirifempty; Name: "{app}"
+
 ; The session scratch folder, if the app was ever killed before it tidied.
 Type: filesandordirs; Name: "{localappdata}\Temp\pentimento-*"
+Type: files; Name: "{localappdata}\Temp\pentimento-children"
 
 [Code]
 { ---------------------------------------------------------------------

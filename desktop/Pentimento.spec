@@ -14,7 +14,7 @@
 # and WKWebView on macOS, both of which are operating system components.
 import os
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 SPEC_DIR = Path(SPECPATH).resolve()
 ROOT = SPEC_DIR.parent
@@ -80,12 +80,47 @@ a = Analysis(
         # Nothing here draws a chart or opens a notebook.
         "tkinter", "matplotlib", "numpy", "pandas", "scipy",
         "PIL", "pytest", "PyInstaller", "setuptools", "pip",
+        # 14 MB of cryptography and OpenSSL that this application never
+        # imports. They were swept up from whatever else happened to be
+        # installed on the build machine, which also meant a local build
+        # and a CI build could differ in size.
+        "cryptography", "OpenSSL", "pyOpenSSL", "cffi", "_cffi_backend",
+        # Test and packaging machinery that follows dependencies in.
+        "unittest", "pydoc_data", "lib2to3", "test", "idlelib",
     ],
     noarchive=False,
 )
 
 a.datas = _drop_exiftool_test_suite(a.datas)
 a.binaries = _drop_exiftool_test_suite(a.binaries)
+
+
+def _drop_hoisted_vendor_libraries(binaries, datas):
+    """Remove top-level copies of DLLs that already ship inside vendor/.
+
+    PyInstaller inspects the vendored ExifTool, finds Perl's own DLLs and
+    helpfully copies them beside the executable as well. ExifTool loads
+    them from its own folder, so the top-level pair is 4.6 MB of exact
+    duplicate.
+    """
+    # Both copies arrive in `binaries`: the vendored one keeps its path,
+    # the hoisted one is a bare filename at the bundle root.
+    vendored = {
+        PurePosixPath(dest.replace("\\", "/")).name.lower()
+        for dest, *_ in list(binaries) + list(datas)
+        if "vendor/" in dest.replace("\\", "/")
+    }
+    keep = []
+    for entry in binaries:
+        dest = entry[0].replace("\\", "/")
+        name = PurePosixPath(dest).name.lower()
+        if "/" not in dest and name in vendored:
+            continue
+        keep.append(entry)
+    return keep
+
+
+a.binaries = _drop_hoisted_vendor_libraries(a.binaries, a.datas)
 
 pyz = PYZ(a.pure)
 

@@ -319,3 +319,59 @@ body.dragging::after {
 .colophon a:hover { color: var(--accent); }
 .colophon .sep { opacity: .4; margin: 0 4px; }
 .colophon-note { opacity: .65; }
+
+/* ---------- theme picker ------------------------------------------------ */
+.themepick {
+  width: auto; min-width: 9.5rem; min-height: 36px;
+  padding: 6px 10px;
+  font: 500 12px/1 var(--font-mono);
+  letter-spacing: .04em;
+  background: var(--raised); color: var(--muted);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+}
+.themepick:hover { border-color: var(--accent); color: var(--ink); }
+
+/* ---------- e-ink ------------------------------------------------------
+   The theme's rule is that colour carries nothing, because every state
+   already appears beside the word for what it means. These are the three
+   places this app leaned on colour alone, and what replaces it.          */
+
+/* Category swatches would all resolve to ink, so a row of identical black
+   squares would say less than nothing. The label beside each one already
+   names the category. */
+[data-theme="eink"] .swatch,
+[data-theme="eink"] .legend .swatch { display: none; }
+[data-theme="eink"] .legend span { border-bottom: 1px solid var(--line); }
+
+/* Risk was a red number. Here it is a heavier number with a rule under it. */
+[data-theme="eink"] .card.risk .card-count {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+/* A pass dot and a fail dot were a green disc and a red ring. Ink makes
+   them the same disc, so the shape does the work instead. */
+[data-theme="eink"] .gate .dot.pass {
+  background: var(--ink);
+  border-radius: 50%;
+}
+[data-theme="eink"] .gate .dot.fail {
+  background: none;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+[data-theme="eink"] .finding.warning .rulename { text-decoration: underline; }
+
+/* The blurred value is a filter, which an e-ink panel renders as a smear
+   rather than a blur. A solid block reads correctly and still conceals. */
+[data-theme="eink"] .veil .veil-text {
+  filter: none;
+  background: var(--ink);
+  color: transparent;
+}
+[data-theme="eink"] .veil.open .veil-text {
+  background: none;
+  color: var(--ink);
+}

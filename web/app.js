@@ -635,22 +635,37 @@ async function applyChanges() {
 
 /* ---------- theme ---------- */
 
-const THEMES = ["dark", "light", "hc-dark", "hc-light"];
-const THEME_LABEL = {
-  dark: "Dark", light: "Light", "hc-dark": "High contrast dark",
-  "hc-light": "High contrast light",
-};
+/* Five themes, picked rather than cycled. Cycling through five to reach
+ * the one you want is four wrong answers on the way. */
+const THEMES = [
+  ["dark", "Dark"],
+  ["light", "Light"],
+  ["eink", "E-ink"],
+  ["hc-dark", "High contrast dark"],
+  ["hc-light", "High contrast light"],
+];
 
 function applyTheme(name) {
   document.documentElement.setAttribute("data-theme", name);
-  $("theme-label").textContent = THEME_LABEL[name];
+  const picker = $("theme");
+  if (picker && picker.value !== name) picker.value = name;
   try { localStorage.setItem("theme", name); } catch { /* private mode */ }
 }
 
 function initTheme() {
+  const picker = $("theme");
+  picker.innerHTML = "";
+  for (const [value, label] of THEMES) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    picker.append(option);
+  }
+
   let stored = null;
   try { stored = localStorage.getItem("theme"); } catch { /* private mode */ }
-  applyTheme(THEMES.includes(stored) ? stored : "dark");
+  const known = THEMES.some(([value]) => value === stored);
+  applyTheme(known ? stored : "dark");
 }
 
 /* ---------- wiring ---------- */
@@ -739,10 +754,7 @@ function wire() {
     renderTags(state.tags);
   };
 
-  $("theme").onclick = () => {
-    const current = document.documentElement.getAttribute("data-theme");
-    applyTheme(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length]);
-  };
+  $("theme").onchange = (e) => applyTheme(e.target.value);
 }
 
 initTheme();

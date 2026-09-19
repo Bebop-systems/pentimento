@@ -1,0 +1,337 @@
+/* geodzk e-ink — the fifth theme.
+ *
+ * Two halves. The palette below is transcribed from the design system's
+ * theme_eink.py; the rules after it are handoff/geodzk-eink.css verbatim.
+ *
+ * The discipline is worth knowing before touching a value: an e-ink panel
+ * has sixteen grey levels, evenly spaced, so every channel here is a
+ * multiple of 0x11. A value off that ladder is not drawn faintly, it is
+ * dithered into a mottle or quantised to a neighbour, which means the
+ * grey you chose was never the grey shown.
+ *
+ * Colour carries nothing in this theme. Accent, danger, warn and ok are
+ * all ink, because every one of them already appears beside the word for
+ * what it means. Where colour was the only signal, a shape replaces it
+ * rather than a grey.
+ */
+
+[data-theme="eink"] {
+  --bg: #FFFFFF;
+  --panel: #FFFFFF;
+  --raised: #EEEEEE;
+  --ink: #000000;
+  --muted: #444444;
+  --quiet: #444444;
+  --line: #555555;
+  --accent: #000000;
+  --accent-ink: #FFFFFF;
+  --danger: #000000;
+  --warn: #000000;
+  --ok: #000000;
+  --star: #000000;
+  --grad-a: #FFFFFF;
+  --grad-b: #FFFFFF;
+  --lamp: transparent;
+}
+
+/* ===========================================================================
+   geodzk-eink.css — the CSS half of the fifth theme, plus the two defects
+   looking for it turned up in the two themes that already exist for
+   accessibility, plus one line of marginalia (item two, carrier b).
+
+   Against claudeconnection-del/geodzk @ 77b8ecb388379840eaaaa0d67597257bb4b1ced1
+   Companion: handoff/theme_eink.py, which carries the palette.
+
+   Nothing here is a new section. Every block below belongs to a section that
+   already owns the rule it changes, in the shape §1–§15 were folded into in
+   aec68e7 — no §16, no appendix.
+
+       part 1 → §1   one new derived token, and why
+       part 2 → §2   the hc-* block: two lines it was always missing
+       part 3 → §2   [data-theme="eink"], the derived half of the theme
+       part 4 → §3   the backdrop, withdrawn
+       part 5 → §10  motion, withdrawn outright
+       part 6 → §7.3 the engraved mesh, raised onto the ladder
+       part 7 → §5/§6 three substitutions where color was the only signal
+       part 8 → §13/§15 the field, and what the appearance popover offers
+       part 9 → §7.3 the marginalia line
+
+   Constraints held: no url(), no @import, no webfont, no style attribute, no
+   script, no backslash escape. Every color is a token or a mix of one.
+   =========================================================================== */
+
+
+/* --- part 1 · §1 ----------------------------------------------------------
+   The light source is two layers, and only one of them is a token.
+
+   §3's `body::before` paints `radial-gradient(..., var(--lamp), ...)` and then
+   a second radial of `color-mix(in srgb, var(--accent) 6%, transparent)`. The
+   first withdraws cleanly in any theme that sets `--lamp: transparent`. The
+   second cannot be withdrawn at all, because it is a literal in the rule.
+
+   Give it a name. Then the hc-* block can withdraw it, this theme can withdraw
+   it, and §2's claim that high contrast drops "every glow, tint and shadow"
+   becomes true rather than nearly true.
+
+   ADD to the `:root, .gz` block in §1, beside --glow and --tint: */
+:root, .gz {
+  --lamp-cool: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* AND in §3, `body::before, .gz-page::before`, the second radial becomes:
+
+     radial-gradient(40rem 26rem at 6% 4%, var(--lamp-cool), transparent 72%);
+
+   No visual change on dark or light. */
+
+
+/* --- part 2 · §2 ----------------------------------------------------------
+   Two defects in hc-dark and hc-light, found by asking what this theme would
+   have to withdraw and then checking whether they had withdrawn it.
+
+   ONE. The accent wash above is still painted in both high-contrast themes. It
+   is decoration on the two themes whose stated doctrine is that decoration is
+   withdrawn outright, and it sits behind text: `body::before` is z-index -1,
+   above the body background and below content, so anything not on a panel is
+   reading over it. At the center of the blob in hc-dark it takes white-on-black
+   from 21.00:1 to 19.64:1. Nowhere near a failure — and still a theme whose
+   test asserts exactly 21:1 while the rendered page does not deliver it.
+
+   TWO. `::selection { background: var(--tint-strong) }` and the hc-* block sets
+   `--tint-strong: transparent`. Selecting text in either high-contrast theme
+   therefore highlights nothing at all: the browser default is overridden by a
+   transparent fill. That is a plain loss of function on the two themes that
+   exist for the people most likely to select text to read it.
+
+   ADD both lines to the existing `[data-theme="hc-dark"], [data-theme="hc-light"]`
+   block: */
+[data-theme="hc-dark"], [data-theme="hc-light"] {
+  --lamp-cool: transparent;
+}
+[data-theme="hc-dark"] ::selection,
+[data-theme="hc-light"] ::selection {
+  background: var(--ink);
+  color: var(--bg);
+}
+/* Inversion rather than a tint, because a tint is the thing these themes
+   withdraw. `--ink` and `--bg` are both re-pointed by [data-plane="admin"], so
+   this is correct on the dome without a second rule. */
+
+
+/* --- part 3 · §2 ----------------------------------------------------------
+   The derived half of the fifth theme: the same withdrawal the hc-* block
+   performs, for the same reason — a shadow, a glow and a tint are all a
+   gradient of something, and this panel does not have the levels for one.
+
+   `--hair` is the one that matters most. 70% of #555555 over paper lands
+   between two levels of sixteen; the panel either dithers a one-pixel line or
+   drops it. A hairline that vanishes is not a quiet line, it is no line. */
+[data-theme="eink"] {
+  --hair: var(--line);
+  --lift: none;
+  --lift-lg: none;
+  --glow: transparent;
+  --tint: transparent;
+  --tint-strong: transparent;
+  --lamp-cool: transparent;
+}
+[data-theme="eink"] ::selection {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+
+/* --- part 4 · §3 ----------------------------------------------------------
+   Both layers of the light source now resolve to transparent, so the
+   pseudo-element paints nothing. Take it out rather than animate nothing: an
+   element with a filling animation is a containing block for anything fixed
+   inside it, and this one has no reason to exist on paper.
+
+   There is no lamp on this theme and nothing replaces it. A lit room is the
+   metaphor for a screen that emits light. This one does not. */
+[data-theme="eink"] body::before,
+[data-theme="eink"] .gz-page::before {
+  display: none;
+}
+
+
+/* --- part 5 · §10 --------------------------------------------------------
+   Nothing animates. Not reduced — none.
+
+   A partial refresh cannot show a transition, and a full one ghosts, so every
+   frame between the first and the last is either invisible or damage. §10's
+   claim is that none of its five signatures is decorative-only, which is worth
+   answering one at a time:
+
+     gz-bloom   the lamp breathing, so the page reads as lit rather than
+                painted. Nothing replaces it. On this theme the page is not lit;
+                it is a page. This is the one signature with no job here.
+     gz-rise    content arriving. Replaced by the hardware: a page load on
+                e-ink IS a full-panel refresh, visible, about half a second,
+                and it is the arrival animation whether anyone designed it or
+                not.
+     gz-trace   the mark drawing itself once. Collapses to the solid arc, which
+                is what reduced motion already does and is the correct resting
+                state.
+     gz-blink   the dot marking something live. The only one carrying
+                information that motion was the sole bearer of. Replaced by a
+                shape in part 7.
+     gz-drift   withdrawn. So are gz-say, gz-close, gz-notice, gz-travel and
+                gz-ambient.
+
+   `animation: none` rather than the reduced-motion block's `.001ms`, because
+   this is not a preference to be honored minimally — the display cannot draw
+   the frames. */
+[data-theme="eink"] *,
+[data-theme="eink"] *::before,
+[data-theme="eink"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+
+/* --- part 6 · §7.3 -------------------------------------------------------
+   The engraved mesh, raised until the panel can hold it.
+
+   At 4–6% of ink the mesh is not faint here, it is absent: one level of sixteen
+   is 6.7%, so those hairlines quantise to the nearest step or dither into a
+   mottle, and the mottle is worse than nothing. §7.3's rule is that if a
+   surface is engraved, what happened on it is written down somewhere — so this
+   cannot simply be dropped, and it should not be replaced by something else
+   either. It is the same drawing, at a level that exists.
+
+   13% of ink over paper lands on 0xDD, two levels below white: visible as a
+   fine tone, nowhere near text contrast, and rendered flat. The pitch widens
+   from 8px to 14px because on a 226 DPI panel a 1px line every 8px is close
+   enough to read as a gray wash rather than as a mesh, and it is the crossing
+   that carries the meaning. */
+[data-theme="eink"] .engraved,
+[data-theme="eink"] .audit {
+  background-image:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--ink) 13%, transparent) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--ink) 13%, transparent) 0 1px, transparent 1px 14px);
+}
+/* The top edge was 45% of the accent, which is now ink. At full strength on a
+   4px strip it reads as engine-turning on a certificate, which is the correct
+   register for the one surface where an admin action is about to be recorded. */
+[data-theme="eink"] .engraved-top::before {
+  background:
+    repeating-linear-gradient(60deg,
+      var(--ink) 0 1px, transparent 1px 12px),
+    repeating-linear-gradient(-60deg,
+      var(--ink) 0 1px, transparent 1px 12px);
+}
+
+
+/* --- part 7 · §5, §6 -----------------------------------------------------
+   Three substitutions, and only three, wherever color was the only signal.
+   One vocabulary each: shape, weight, hatch. No grays — a false hierarchy in
+   mid-tones would ghost and would be a lie besides.
+
+   SHAPE. `.dot.live` is `--ok` plus gz-blink. Both are gone, which would leave
+   it identical to a plain filled dot. §6 already documents the vocabulary that
+   answers this: filled is on, a hollow ring is running. Live borrows the ring —
+   on paper, "live" and "running" are the same claim. */
+[data-theme="eink"] .dot.live {
+  background: none;
+  border: 1.5px solid currentColor;
+  width: 8px;
+  height: 8px;
+}
+/* The glow goes; the fill stays. `.dot.lit` is ink where a plain dot is
+   currentColor, which in the muted contexts it appears in is four levels
+   lighter — so the distinction survives without the bloom. */
+[data-theme="eink"] .dot.lit {
+  box-shadow: none;
+}
+/* `.dot.off` was `--muted` at 50% opacity: #444 at half over paper is 0xA1,
+   between two levels, and a dithered 7px disc is a smudge. 33% of ink lands on
+   0xAA — the same tone, one the panel has. */
+[data-theme="eink"] .dot.off {
+  opacity: 1;
+  background: color-mix(in srgb, var(--ink) 33%, transparent);
+}
+
+/* WEIGHT. `.msg.err`, `.msg.ok` and `.msg.warn` differ only in color, and all
+   three colors are now ink. The words differ — that is §13 and it holds — but
+   a glance should not have to read. A second pixel of border on the two that
+   mean stop and read, and nothing on the one that means it worked. Same
+   treatment on the pills that mean be careful. */
+[data-theme="eink"] .msg.err,
+[data-theme="eink"] .msg.warn,
+[data-theme="eink"] .pill.role-admin,
+[data-theme="eink"] .pill.warn {
+  border-width: 2px;
+}
+/* "You are here" was the accent, on the page nav, the current section, and
+   aria-current. Weight plus a real underline reads in a vertical rail and in a
+   horizontal chip strip alike, and needs neither a fill nor a glyph. */
+[data-theme="eink"] [aria-current] {
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* HATCH. `.meter > span` is the accent and `.meter.warn > span` is `--danger`,
+   so a meter at 90% and a meter 90% over its ceiling become the same black bar.
+   A hatched fill is the printer's answer and it is the mesh's own angle. */
+[data-theme="eink"] .meter.warn > span {
+  background:
+    repeating-linear-gradient(45deg,
+      var(--bg) 0 2px, var(--ink) 2px 4px);
+}
+
+
+/* --- part 8 · §13, §15 --------------------------------------------------
+   The field has nothing to draw here. A canvas that turns a dome once every
+   four minutes is, on this panel, a full refresh every four minutes for a
+   sliver of geometry in the gutter — the worst trade in the system.
+
+   The CSS belt: */
+[data-theme="eink"] .fieldcanvas,
+[data-theme="eink"] .fieldstill {
+  display: none;
+}
+/* The braces, and it is the ONE script change this theme needs.
+   `geodesic-field.js` already reads `data-theme` off the document and has a
+   high-contrast branch that draws the still mesh instead of moving. Add `eink`
+   at the level above that: do not mount, do not draw the still frame, do not
+   idle in a loop. `display: none` stops the paint but not the requestAnimationFrame,
+   and battery is the whole reason this theme exists.
+
+   Two consequences worth deciding rather than discovering:
+
+   - The Backdrop fieldset in the appearance popover offers Solid, Gradient and
+     Field. On this theme the gradient is a no-op (both stops are paper) and the
+     field is withdrawn, so all three values do the same thing. Hide the fieldset
+     here — a control with three labels and one outcome is worse than no control.
+     It needs the fieldset's own class or id, which I could not read: the popover
+     markup in _theme_control() renders it inline. Selector left for whoever
+     lands this, one line, in this part.
+   - `gz-notice`, the nudge on the appearance button, exists to point at the
+     field. With the field gone the nudge points at nothing, and part 5 has
+     already silenced it. `nudgeAppearance()` should not fire on this theme;
+     harmless if it does, since the animation is none.
+
+   Nothing to do for paper: `paper_page()` is pinned to data-theme="light" and
+   draws its own ink on its own white, which is already what this panel is. */
+
+
+/* --- part 9 · §7.3 -----------------------------------------------------
+   Item two, carrier b. A custom property is a declaration, not a comment, so
+   `_normalise_css` carries it to the browser: it appears in the Computed panel
+   beside every token, on the one surface somebody opens the inspector to look
+   at. Twelve kilobytes of rationale never ship. This is the sentence of it that
+   does, and it is on the rule it is about.
+
+   ADD as the first declaration of `.engraved` in §7.3. One line, single spaces
+   only — `_normalise_css` collapses whitespace and would eat a run of it inside
+   the string. It is never read by a rule; if tests/test_stylesheet.py asserts
+   that every custom property is consumed somewhere, this is the exception and
+   wants naming as one. */
+.engraved {
+  --note: "Two hairline sets crossing at ±60°: the triangulation of a geodesic dome, and the intaglio of a banknote. One drawing doing both jobs. The rule that comes with it — if a surface is engraved, what happened on it is written down somewhere.";
+}
