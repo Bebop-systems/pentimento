@@ -123,9 +123,16 @@ class ChildGuard:
             # both visible to the user and noisy to anything watching
             # process creation.
             return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
-        if sys.platform != "win32":
-            # Its own group, so an orderly shutdown can sweep the tree.
-            return {"start_new_session": True}
+
+        # Deliberately nothing on POSIX. An earlier version passed
+        # start_new_session=True, reasoning that its own process group
+        # would be tidier. It does the opposite: a new session detaches the
+        # child from the parent entirely, so it survives anything that
+        # happens to the parent. macOS CI caught it.
+        #
+        # Staying in the same session means the child keeps the parent's
+        # stdin pipe, and ExifTool in -stay_open mode exits when that pipe
+        # reaches EOF, which is what happens when the parent dies.
         return {}
 
     def close(self) -> None:
