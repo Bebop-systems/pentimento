@@ -4,6 +4,33 @@ All notable changes to this project are recorded here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-09-19
+
+Side-by-side installs, and telling two copies apart.
+
+### Added
+
+- The installer detects an existing installation and says so, offering to
+  upgrade it (the default and the recommendation) or install alongside it.
+  A side-by-side install takes its own identity: its own uninstall entry,
+  directory and Start menu group, so the two never collide. `/PARALLEL=yes`
+  does the same without the wizard, for deployment tooling.
+- Icons carry the version inside the mark. Major and minor sit in the two
+  upper cells the median lines create, patch in the lower one, so two
+  installed copies are distinguishable in the Start menu and the taskbar
+  without reading a tooltip.
+- The window title and the executable's FileDescription both carry the
+  version, so Task Manager and any process list identify which copy is
+  which.
+- The installer wears the application's own colours: the same dark panel
+  and geodesic mark rather than the default grey.
+
+### Notes
+
+- Upgrading in place already worked and was verified rather than assumed:
+  installing a newer build over an older one reuses its location, replaces
+  the files, and leaves exactly one uninstall entry.
+
 ## [0.1.1] — 2026-09-19
 
 macOS is now built and tested in CI rather than written and hoped for.

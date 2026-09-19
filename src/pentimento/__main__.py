@@ -22,9 +22,12 @@ from pentimento.paths import (  # noqa: E402
     default_output_dir, find_exiftool, is_frozen,
 )
 from pentimento.server import create_app  # noqa: E402
+from pentimento.version import __version__  # noqa: E402
 
 HOST = "127.0.0.1"
-WINDOW_TITLE = "Pentimento"
+# Carries the version so two side-by-side copies are told apart in
+# the taskbar, in Task Manager's Apps group and in a window list.
+WINDOW_TITLE = f"Pentimento {__version__}"
 
 
 def free_port() -> int:

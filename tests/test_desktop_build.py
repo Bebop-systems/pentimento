@@ -101,3 +101,106 @@ def test_build_check_reports_problems_as_actionable_strings():
 def test_a_build_machine_reports_ready():
     from desktop.build import check
     assert check() == [], "build tooling is installed but check() objects"
+
+
+# ---------- installer behaviour ----------
+
+INSTALLER = DESKTOP / "installer.iss"
+
+
+def test_installer_exists():
+    assert INSTALLER.is_file()
+
+
+def test_upgrade_is_the_default_identity():
+    """A fixed AppId is what makes a new build replace the old one rather
+    than pile up beside it. Losing it would silently break upgrades."""
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert '#define BaseAppId     "7B2F5A64-9C3E-4D18-9A6F-2E5C1D0B7A43"' in text
+    assert "AppId={code:GetAppId}" in text
+    # The upgrade branch must return the base id unchanged.
+    assert "Result := '{#BaseAppId}';" in text
+
+
+def test_a_side_by_side_install_gets_its_own_identity():
+    """Two installs sharing one uninstall key would leave the second
+    unremovable, so every identifying field is suffixed."""
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert "Result := '{#BaseAppId}_{#AppVersion}'" in text
+    for suffixed in ("GetDefaultDir", "GetGroupName", "GetDisplayName"):
+        assert f"function {suffixed}" in text
+    assert "{#AppName} {#AppVersion}" in text
+
+
+def test_scripted_appid_has_its_required_companions():
+    """Inno refuses to compile an AppId containing constants unless both
+    of these are disabled, and the error names them only at build time."""
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert "UsePreviousLanguage=no" in text
+    assert "UsePreviousPrivileges=no" in text
+
+
+def test_the_parallel_switch_is_scriptable():
+    """Deployment tooling cannot click a wizard page."""
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert "{param:PARALLEL|no}" in text
+
+
+def test_the_installer_wears_the_application_styling():
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert "WizardImageFile=" in text
+    assert "WizardSmallImageFile=" in text
+    for name in ("wizard-large-164x314.png", "wizard-small-55x55.png"):
+        assert name in text
+        assert (DESKTOP / name).is_file(), f"{name} is referenced but missing"
+
+
+def test_wizard_images_are_generated_not_drawn_by_hand():
+    """They have to be reproducible, or they drift from the app's icon."""
+    from desktop.make_icon import build_wizard_images
+
+    produced = build_wizard_images(DESKTOP)
+    assert len(produced) >= 8
+    for path in produced:
+        data = path.read_bytes()
+        assert data[:8] == b"\x89PNG\r\n\x1a\n"
+        assert len(data) > 200
+
+
+def test_parallel_choice_does_not_rely_on_short_circuit_evaluation():
+    """Inno's Pascal does not short-circuit `and`, so reading a page's
+    selection in the same expression that checks it exists would fault."""
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert "if not Assigned(ChoicePage) then" in text
+
+
+def test_icons_carry_the_version_inside_the_mark():
+    """Two installed copies have to be distinguishable at a glance."""
+    from desktop.make_icon import MIN_VERSION_SIZE, render
+
+    plain = render(128, "")
+    stamped = render(128, "0.1.2")
+    assert plain != stamped, "the version stamp made no difference"
+
+    # Different versions must look different, or the whole point is lost.
+    assert render(128, "0.1.2") != render(128, "0.2.0")
+
+    # Below the threshold the digits would be mush, so they are omitted.
+    assert render(16, "0.1.2") == render(16, "")
+    assert MIN_VERSION_SIZE >= 32
+
+
+def test_the_process_identifies_its_version():
+    """Task Manager reads FileDescription, and groups apps by window
+    title. Both have to name the version or side-by-side copies are
+    indistinguishable in a process list."""
+    from pentimento.version import __version__
+
+    resource = (DESKTOP / "version_info.txt").read_text(encoding="utf-8")
+    description = [line for line in resource.splitlines()
+                   if "FileDescription" in line][0]
+    assert __version__ in description
+
+    main = (PROJECT_ROOT / "src" / "pentimento" / "__main__.py").read_text(
+        encoding="utf-8")
+    assert "WINDOW_TITLE = f\"Pentimento {__version__}\"" in main
