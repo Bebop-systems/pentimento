@@ -4,6 +4,35 @@ All notable changes to this project are recorded here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-09-19
+
+Complete uninstall, a theme picker, and a smaller bundle.
+
+### Added
+
+- **E-ink theme** from the GeoDzk design system, and a proper selector in
+  place of the cycling toggle — five themes is four wrong answers away if
+  you have to cycle. Where this app used colour as the only signal, e-ink
+  substitutes a shape: the pass and fail gate marks become a disc and a
+  rotated square, the category swatches give way to their labels, and the
+  concealed-value blur becomes a solid block, because a panel renders a
+  blur as a smear.
+
+### Fixed
+
+- **Uninstall now removes everything.** It deleted every installed file
+  but left the empty directory tree, which also stopped it removing the
+  uninstaller and the folder — so a later install moved into the shell.
+  Scoped to `{app}`, so removing one side-by-side copy leaves the other
+  untouched.
+
+### Changed
+
+- The bundle is **29% smaller**: 74.5 MB to 53 MB installed, 24 MB to
+  18 MB for the installer. 14 MB of cryptography and OpenSSL the
+  application never imports, 7.6 MB of ExifTool payloads it never asks
+  for, and 4.6 MB of Perl DLLs duplicated beside the executable.
+
 ## [0.1.2] — 2026-09-19
 
 Side-by-side installs, and telling two copies apart.
