@@ -202,3 +202,32 @@ def test_repeated_writes_do_not_overwrite_each_other(client, sample_heic):
         paths.append(Path(result["saved_path"]))
     assert paths[0] != paths[1]
     assert all(p.is_file() for p in paths)
+
+
+def test_presets_endpoint_groups_credible_and_novelty_profiles(client):
+    data = client.get("/api/presets").get_json()
+    assert "pixel-8" in data["credible"]
+    assert "gameboy-camera" in data["novelty"]
+    assert set(data["credible"]) & set(data["novelty"]) == set()
+    assert data["profiles"]["gameboy-camera"]["novelty"] is True
+    assert data["profiles"]["pixel-8"]["novelty"] is False
+    assert data["profiles"]["toaster"]["note"]
+
+
+def test_novelty_reprofile_writes_and_verifies(client, sample_heic):
+    session = _upload(client, sample_heic).get_json()["session"]
+    result = client.post("/api/apply", json={
+        "session": session, "preset": "reprofile", "profile": "gameboy-camera",
+    }).get_json()
+    assert result["ok"], result["gates"]
+    assert all(g["ok"] for g in result["gates"])
+
+
+def test_novelty_identity_is_flagged_as_inconsistent(client, sample_heic):
+    """Claiming a Game Boy took an IMG_*.HEIC should be reported, not hidden."""
+    session = _upload(client, sample_heic).get_json()["session"]
+    data = client.post("/api/preview", json={
+        "session": session, "preset": "reprofile", "profile": "gameboy-camera",
+    }).get_json()
+    rules = {f["rule"] for f in data["findings"]}
+    assert "filename_mismatch" in rules

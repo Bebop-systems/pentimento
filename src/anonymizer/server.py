@@ -25,7 +25,7 @@ from .linter import lint
 from .model import EditPlan, TagSet
 from .payload import container_of
 from .presets import PRESETS, build_plan, plan_from_edits
-from .profiles import PROFILES
+from .profiles import CREDIBLE_KEYS, NOVELTY_KEYS, PROFILES
 from .sensitivity import RISK_ORDER, Category, classify
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -242,7 +242,16 @@ def create_app(
     def presets():
         return jsonify({
             "presets": PRESETS,
-            "profiles": {k: p.label for k, p in PROFILES.items()},
+            "profiles": {
+                key: {
+                    "label": profile.label,
+                    "novelty": profile.novelty,
+                    "note": profile.note,
+                }
+                for key, profile in PROFILES.items()
+            },
+            "credible": list(CREDIBLE_KEYS),
+            "novelty": list(NOVELTY_KEYS),
         })
 
     @app.post("/api/upload")
