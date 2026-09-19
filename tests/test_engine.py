@@ -120,9 +120,18 @@ def test_engine_restarts_after_the_process_is_killed(exiftool_path):
 def test_a_hard_kill_does_not_orphan_exiftool(exiftool_path):
     """Nothing in Python runs when a process is killed outright.
 
-    Without an OS-level guarantee the ExifTool child is simply orphaned,
-    and they accumulate: fifteen turned up during one afternoon of manual
-    testing. On Windows a Job Object makes the kernel clean up for us.
+    The guarantee differs by platform, and this asserts the real one
+    rather than a hoped-for one.
+
+    Windows has a kernel mechanism: a Job Object with KILL_ON_JOB_CLOSE,
+    so the child is gone immediately.
+
+    POSIX has none that applies. PR_SET_PDEATHSIG is Linux only, SIGKILL
+    cannot be caught, and ExifTool's -stay_open mode is documented to keep
+    reading past end of file, so closing its stdin does not stop it
+    either. What is achievable is preventing accumulation, which was the
+    actual harm: fifteen orphans piled up during one afternoon of manual
+    testing. The next run reaps what the last one left.
     """
     import subprocess
     import sys
@@ -151,8 +160,26 @@ def test_a_hard_kill_does_not_orphan_exiftool(exiftool_path):
             if not _pid_alive(exiftool_pid):
                 break
             time.sleep(0.1)
+
+        if os.name == "nt":
+            assert not _pid_alive(exiftool_pid), (
+                f"exiftool {exiftool_pid} survived its parent being killed, "
+                f"so the Job Object is not doing its job"
+            )
+            return
+
+        # POSIX: the next engine to start must clear it up, so orphans
+        # cannot accumulate across runs.
+        from pentimento.childguard import ChildGuard
+
+        ChildGuard.reap_strays()
+        for _ in range(50):
+            if not _pid_alive(exiftool_pid):
+                break
+            time.sleep(0.1)
         assert not _pid_alive(exiftool_pid), (
-            f"exiftool {exiftool_pid} survived its parent being killed"
+            f"exiftool {exiftool_pid} survived its parent being killed and "
+            f"was not reaped on the next start"
         )
     finally:
         child.stdout.close()

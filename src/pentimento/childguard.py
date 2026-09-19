@@ -7,14 +7,21 @@ accumulate: fifteen of them turned up during one afternoon of testing.
 
 Windows has one: a Job Object with KILL_ON_JOB_CLOSE terminates every
 assigned process when the last handle to the job closes, which the kernel
-does for us however the parent died. POSIX gets a process group, which
-lets an orderly shutdown sweep the whole tree.
+does for us however the parent died.
+
+POSIX has nothing that applies. PR_SET_PDEATHSIG is Linux only, SIGKILL
+cannot be caught, and ExifTool in -stay_open mode is documented to keep
+reading past end of file, so closing its stdin does not stop it either.
+What is achievable there is preventing accumulation, which was the actual
+harm: each run records the children it spawns and reaps whatever the last
+one left behind.
 """
 from __future__ import annotations
 
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 _IS_WINDOWS = os.name == "nt"
 
@@ -129,11 +136,98 @@ class ChildGuard:
         # would be tidier. It does the opposite: a new session detaches the
         # child from the parent entirely, so it survives anything that
         # happens to the parent. macOS CI caught it.
-        #
-        # Staying in the same session means the child keeps the parent's
-        # stdin pipe, and ExifTool in -stay_open mode exits when that pipe
-        # reaches EOF, which is what happens when the parent dies.
         return {}
+
+    def remember(self, pid: int) -> None:
+        """Record a child so a later run can clean it up.
+
+        POSIX has no equivalent of a Job Object here. ExifTool in
+        -stay_open mode is documented to keep reading past end of file, so
+        closing its stdin does not stop it either, and SIGKILL cannot be
+        caught. What is achievable is preventing *accumulation*: the
+        problem observed in practice was fifteen orphans piling up, not
+        one surviving for a few minutes.
+        """
+        if _IS_WINDOWS:
+            return
+        try:
+            with open(self._ledger(), "a", encoding="utf-8") as ledger:
+                ledger.write(f"{pid}\n")
+        except OSError:
+            pass
+
+    def forget(self, pid: int) -> None:
+        if _IS_WINDOWS:
+            return
+        try:
+            path = self._ledger()
+            if not path.exists():
+                return
+            kept = [
+                line for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and int(line.strip()) != pid
+            ]
+            path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+        except (OSError, ValueError):
+            pass
+
+    @classmethod
+    def reap_strays(cls) -> int:
+        """Kill ExifTool processes a previous run left behind.
+
+        Only processes this application recorded, and only if they are
+        still ExifTool, so a recycled pid cannot be mistaken for one.
+        """
+        if _IS_WINDOWS:
+            return 0
+        import signal
+
+        path = cls._ledger()
+        if not path.exists():
+            return 0
+        killed = 0
+        survivors: list[str] = []
+        try:
+            entries = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return 0
+
+        for entry in entries:
+            entry = entry.strip()
+            if not entry.isdigit():
+                continue
+            pid = int(entry)
+            if not cls._is_exiftool(pid):
+                continue          # gone, or the pid belongs to something else
+            try:
+                os.kill(pid, signal.SIGTERM)
+                killed += 1
+            except OSError:
+                survivors.append(entry)
+        try:
+            path.write_text("\n".join(survivors) + ("\n" if survivors else ""),
+                            encoding="utf-8")
+        except OSError:
+            pass
+        return killed
+
+    @staticmethod
+    def _is_exiftool(pid: int) -> bool:
+        """Confirm a pid is still ours before signalling it."""
+        try:
+            out = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return "exiftool" in out.lower()
+
+    @staticmethod
+    def _ledger() -> Path:
+        import tempfile
+
+        return Path(tempfile.gettempdir()) / "pentimento-children"
 
     def close(self) -> None:
         if self._job is not None:

@@ -60,6 +60,8 @@ class ExifToolEngine:
         # Binds the ExifTool child to this process, so a hard kill of the
         # parent cannot leave it orphaned.
         self._guard = ChildGuard()
+        # Clear up anything a previous run was killed before it could.
+        ChildGuard.reap_strays()
 
     def start(self) -> "ExifToolEngine":
         if self._proc is not None:
@@ -75,6 +77,7 @@ class ExifToolEngine:
             **ChildGuard.spawn_kwargs(),
         )
         self._guard.adopt(self._proc)
+        self._guard.remember(self._proc.pid)
         return self
 
     @staticmethod
@@ -128,6 +131,7 @@ class ExifToolEngine:
                 proc.wait(timeout=5)
             finally:
                 self._close_pipes(proc)
+                self._guard.forget(proc.pid)
 
     def __enter__(self):
         return self.start()
