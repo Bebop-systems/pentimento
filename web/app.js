@@ -13,6 +13,7 @@ const state = {
   shift: 0,
   edits: {},          // key -> new value, or null to delete
   presets: {},
+  profiles: {},
   categories: [],
   tags: [],
   selected: null,     // which category the detail table is showing
@@ -77,15 +78,39 @@ async function loadPresets() {
   preset.value = state.preset;
   $("preset-help").textContent = data.presets[state.preset];
 
+  state.profiles = data.profiles;
+
   const profile = $("profile");
   profile.innerHTML = "";
-  for (const [key, label] of Object.entries(data.profiles)) {
-    const option = document.createElement("option");
-    option.value = key;
-    option.textContent = label;
-    profile.append(option);
+  const groups = [
+    ["Plausible identities", data.credible],
+    ["Novelty identities", data.novelty],
+  ];
+  for (const [caption, keys] of groups) {
+    if (!keys || !keys.length) continue;
+    const group = document.createElement("optgroup");
+    group.label = caption;
+    for (const key of keys) {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = data.profiles[key].label;
+      group.append(option);
+    }
+    profile.append(group);
   }
   profile.value = state.profile;
+  renderProfileNote();
+}
+
+function renderProfileNote() {
+  const note = $("profile-note");
+  const profile = state.profiles[state.profile];
+  const showing = state.preset === "reprofile" && profile && profile.note;
+  note.hidden = !showing;
+  if (!showing) return;
+  note.textContent = profile.novelty
+    ? `${profile.note} Consistency will flag this identity, which is the point — it is meant to be obviously untrue.`
+    : profile.note;
 }
 
 async function upload(file) {
@@ -105,6 +130,7 @@ async function upload(file) {
   $("drop").hidden = true;
   $("workspace").hidden = false;
   $("gates").hidden = true;
+  $("change-file").hidden = false;
   await refresh();
   toast(`Loaded ${data.filename}`);
 }
@@ -429,7 +455,12 @@ function renderGates(result) {
     download.setAttribute("download", result.saved_name || "");
     download.textContent = "Also download";
 
-    saved.append(lead, path, copy, download);
+    const again = document.createElement("label");
+    again.className = "button-link";
+    again.setAttribute("for", "file-input");
+    again.textContent = "Clean another file";
+
+    saved.append(lead, path, copy, download, again);
     panel.append(saved);
   }
 }
@@ -517,9 +548,13 @@ function wire() {
   const drop = $("drop");
   const input = $("file-input");
 
-  // The label opens the picker natively; JS only handles the result.
+  // Every label with for="file-input" opens the picker natively; JS only
+  // handles the result. Clearing value afterwards matters: without it,
+  // choosing the SAME file twice fires no change event and looks broken.
   input.onchange = () => {
-    if (input.files[0]) upload(input.files[0]).catch((e) => showError(e.message));
+    const file = input.files[0];
+    input.value = "";
+    if (file) upload(file).catch((e) => showError(e.message));
   };
 
   for (const event of ["dragenter", "dragover"]) {
@@ -539,13 +574,34 @@ function wire() {
     if (file) upload(file).catch((error) => showError(error.message));
   });
 
+  // Once a file is open the start panel is hidden, so the whole window
+  // accepts a drop. That is the fastest way to move on to the next photo.
+  for (const event of ["dragenter", "dragover", "drop"]) {
+    window.addEventListener(event, (e) => {
+      if (!e.dataTransfer || !e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      document.body.classList.toggle("dragging", event !== "drop");
+      if (event === "drop" && e.dataTransfer.files[0]) {
+        upload(e.dataTransfer.files[0]).catch((err) => showError(err.message));
+      }
+    });
+  }
+  window.addEventListener("dragleave", (e) => {
+    if (e.relatedTarget === null) document.body.classList.remove("dragging");
+  });
+
   $("preset").onchange = (e) => {
     state.preset = e.target.value;
     $("preset-help").textContent = state.presets[state.preset] || "";
     $("profile-control").hidden = state.preset !== "reprofile";
+    renderProfileNote();
     refresh();
   };
-  $("profile").onchange = (e) => { state.profile = e.target.value; refresh(); };
+  $("profile").onchange = (e) => {
+    state.profile = e.target.value;
+    renderProfileNote();
+    refresh();
+  };
   $("shift").onchange = (e) => {
     state.shift = parseInt(e.target.value, 10) || 0;
     refresh();

@@ -11,6 +11,11 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
+<!-- Page level, so the drop panel and every "load another" control can all
+     open it through `for=`, with no JavaScript in the path. -->
+<input type="file" id="file-input" class="sr"
+       accept="image/*,video/*,.heic,.heif,.dng,.cr2,.nef,.arw">
+
 <div class="wrap">
 
   <header>
@@ -27,6 +32,8 @@
       <span class="sub">exif · xmp · gps</span>
     </h1>
     <span class="spacer"></span>
+    <label for="file-input" class="headerbtn" id="change-file" hidden
+           title="Pick another photo or video">Load another</label>
     <button type="button" id="theme" class="link" title="Switch theme">
       <span id="theme-label">Dark</span>
     </button>
@@ -45,8 +52,6 @@
 
     <!-- ---------- drop zone ---------- -->
     <label class="panel dropzone" id="drop" for="file-input">
-      <input type="file" id="file-input" class="sr"
-             accept="image/*,video/*,.heic,.heif,.dng,.cr2,.nef,.arw">
       <span class="dropzone-inner">
         <svg viewBox="0 0 24 24" class="dropzone-icon" aria-hidden="true">
           <path d="M12 16V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor"
@@ -84,6 +89,7 @@
           </div>
         </div>
         <p class="hint" id="preset-help"></p>
+        <p class="hint" id="profile-note" hidden></p>
       </section>
 
       <section class="panel engraved-top" id="gates" hidden></section>
