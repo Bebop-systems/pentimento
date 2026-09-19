@@ -64,6 +64,8 @@ if WINDOWS:
         "webview.platforms.winforms",
         "clr",
         "clr_loader",
+        "cffi",
+        "_cffi_backend",
     ]
 elif MACOS:
     hiddenimports += ["webview.platforms.cocoa"]
@@ -80,11 +82,18 @@ a = Analysis(
         # Nothing here draws a chart or opens a notebook.
         "tkinter", "matplotlib", "numpy", "pandas", "scipy",
         "PIL", "pytest", "PyInstaller", "setuptools", "pip",
-        # 14 MB of cryptography and OpenSSL that this application never
+        # 13 MB of cryptography and OpenSSL that this application never
         # imports. They were swept up from whatever else happened to be
         # installed on the build machine, which also meant a local build
         # and a CI build could differ in size.
-        "cryptography", "OpenSSL", "pyOpenSSL", "cffi", "_cffi_backend",
+        #
+        # cffi is deliberately NOT here. It looks like part of the same
+        # cluster and is only about a megabyte, but clr_loader imports it
+        # to load the .NET runtime. Excluding it broke pythonnet, which
+        # broke pywebview, and the application fell back to opening a
+        # browser tab - shipped in 0.1.3 because the size work was
+        # verified and the window was not.
+        "cryptography", "OpenSSL", "pyOpenSSL",
         # Test and packaging machinery that follows dependencies in.
         "unittest", "pydoc_data", "lib2to3", "test", "idlelib",
     ],

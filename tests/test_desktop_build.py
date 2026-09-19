@@ -231,3 +231,77 @@ def test_exiftool_optional_payloads_are_pruned():
     assert "lib/Image/ExifTool/Geolocation.dat" in fx._PRUNE_FILES
     assert "lib/Image/ExifTool/TagNames.pod" in fx._PRUNE_FILES
     assert any("Lang" in g for g in fx._PRUNE_GLOBS)
+
+
+def test_cffi_is_kept_even_though_it_looks_like_crypto_clutter():
+    """The regression that shipped in 0.1.3.
+
+    cffi sits beside cryptography in any dependency listing and is about a
+    megabyte, so it looked like part of the same unused cluster. But
+    clr_loader imports it to load the .NET runtime: without it pythonnet
+    fails, pywebview finds no host, and the application quietly opens a
+    browser tab instead of its own window.
+    """
+    spec = SPEC.read_text(encoding="utf-8")
+    excludes = spec.split("excludes=[")[1].split("]")[0]
+    assert '"cffi"' not in excludes
+    assert '"_cffi_backend"' not in excludes
+    assert '"cffi"' in spec, "cffi must be a hidden import"
+
+
+def test_the_build_interrogates_its_own_output():
+    """Size was verified and the window was not, which is how 0.1.3
+    shipped. A bundle is only trustworthy if it is asked directly."""
+    build = (DESKTOP / "build.py").read_text(encoding="utf-8")
+    assert "def verify(" in build
+    assert "--selftest" in build
+    assert "verify(produced)" in build
+
+
+def test_selftest_reports_what_a_bundle_can_break():
+    from pentimento.__main__ import selftest
+    import io, json, contextlib
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = selftest()
+    report = json.loads(out.getvalue())
+    for key in ("version", "exiftool", "web_assets", "native_window", "problems"):
+        assert key in report
+    assert code == 0, report["problems"]
+
+
+def test_the_committed_icons_carry_the_current_version():
+    """They were generated stamped, committed stamped, and then rebuilt
+    unstamped by every build, so the numbers never reached a release."""
+    import struct
+
+    from desktop.make_icon import render
+    from pentimento.version import __version__
+
+    data = (DESKTOP / "icon.ico").read_bytes()
+    count = struct.unpack("<HHH", data[:6])[2]
+    checked = 0
+    for index in range(count):
+        width, _, _, _, _, _, size, offset = struct.unpack(
+            "<BBBBHHII", data[6 + 16 * index:22 + 16 * index]
+        )
+        pixels = width or 256
+        if pixels < 64:
+            continue
+        entry = data[offset:offset + size]
+        assert entry == render(pixels, __version__), (
+            f"the {pixels}px icon is not stamped {__version__} - run "
+            f"python desktop/make_icon.py"
+        )
+        checked += 1
+    assert checked, "no icon large enough to carry a stamp was checked"
+
+
+def test_the_build_stamps_the_icons_it_regenerates():
+    build = (DESKTOP / "build.py").read_text(encoding="utf-8")
+    icons = build.split("def icons(")[1].split("\ndef ")[0]
+    assert "__version__" in icons, "build.py regenerates icons unstamped"
+    for produced in ("build_ico", "build_png", "build_icns",
+                     "build_wizard_images"):
+        assert produced in icons

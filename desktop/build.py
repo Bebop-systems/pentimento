@@ -134,12 +134,24 @@ def installer() -> Path:
 
 
 def icons() -> None:
-    from desktop.make_icon import build_icns, build_ico, build_png
+    """Regenerate every icon, stamped with the version.
 
-    build_ico(DESKTOP / "icon.ico")
-    build_png(DESKTOP / "icon.png")
-    build_icns(DESKTOP / "icon.icns")
-    print("icons generated")
+    The version argument is not optional in practice. Without it this
+    function quietly rebuilt unstamped icons over the stamped ones on
+    every single build, so the numbers were generated, committed, and
+    then destroyed before they ever reached a release.
+    """
+    from desktop.make_icon import (
+        build_icns, build_ico, build_png, build_wizard_images,
+    )
+    from pentimento.version import __version__
+
+    build_ico(DESKTOP / "icon.ico", __version__)
+    build_png(DESKTOP / "icon.png", 512, __version__)
+    build_icns(DESKTOP / "icon.icns", __version__)
+    build_png(DESKTOP / "icon-intune-256.png", 256, __version__)
+    build_wizard_images(DESKTOP)
+    print(f"icons generated, stamped {__version__}")
 
 
 def build() -> Path:
@@ -167,7 +179,42 @@ def build() -> Path:
     produced = DIST / (MACOS_APP if sys.platform == "darwin" else APP_NAME)
     size = sum(f.stat().st_size for f in produced.rglob("*") if f.is_file())
     print(f"\nbuilt {produced}  ({size / 1048576:.0f} MB)")
+    verify(produced)
     return produced
+
+
+def verify(produced: Path) -> None:
+    """Ask the built application what it can do, and refuse a bad build.
+
+    0.1.3 shipped opening a browser tab instead of its own window,
+    because excluding cffi broke pythonnet and therefore pywebview.
+    Nothing caught it: the size work was verified and the window was not.
+    A bundle can only be trusted if it is asked directly.
+    """
+    if sys.platform == "darwin":
+        binary = produced / "Contents" / "MacOS" / APP_NAME
+    else:
+        binary = produced / f"{APP_NAME}.exe"
+    if not binary.is_file():
+        raise SystemExit(f"built application is missing its binary: {binary}")
+
+    report = DIST / "selftest.json"
+    report.unlink(missing_ok=True)
+    result = subprocess.run(
+        [str(binary), "--selftest", f"--report={report}"],
+        capture_output=True, text=True, timeout=300,
+    )
+    if report.is_file():
+        print(report.read_text(encoding="utf-8"))
+        report.unlink(missing_ok=True)
+    else:
+        print(result.stdout.strip() or result.stderr.strip()
+              or "(the application produced no self test report)")
+    if result.returncode != 0:
+        raise SystemExit(
+            "the built application failed its own self test - see above"
+        )
+    print("self test passed")
 
 
 def archive(produced: Path) -> Path:

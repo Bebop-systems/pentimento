@@ -4,6 +4,29 @@ All notable changes to this project are recorded here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] — 2026-09-19
+
+Two bugs that 0.1.3 shipped, and the guard that should have caught them.
+
+### Fixed
+
+- **The application opened a browser tab instead of its own window.**
+  Excluding `cffi` as part of the size work broke `clr_loader`, which
+  needs it to load the .NET runtime, which broke pythonnet and therefore
+  pywebview. The fallback to a browser is deliberate behaviour, so
+  nothing failed loudly. `cffi` is about a megabyte; the 13 MB actually
+  worth removing was cryptography and OpenSSL, which stay excluded.
+- **Version numbers never reached the icon.** They were generated,
+  committed, and then overwritten on every build, because the build
+  regenerated icons without passing the version.
+
+### Added
+
+- The build now runs the packaged application's own self test and refuses
+  a bundle that fails it: ExifTool present, web assets present, and a
+  native window actually available. Both bugs above were invisible to a
+  source-tree test and obvious to this one.
+
 ## [0.1.3] — 2026-09-19
 
 Complete uninstall, a theme picker, and a smaller bundle.

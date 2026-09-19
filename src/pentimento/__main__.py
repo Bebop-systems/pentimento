@@ -86,8 +86,81 @@ def choose_mode(args: list[str]) -> str:
     return "window" if is_frozen() else "browser"
 
 
+def selftest(report_path: Path | None = None) -> int:
+    """Report what this build can actually do, and exit.
+
+    Run against the packaged application by the build, because the things
+    most likely to break in a bundle are exactly the things a source-tree
+    test cannot see: a missing hidden import, a pruned data file, a
+    webview host that silently declines and falls back to a browser.
+    """
+    import json
+
+    from pentimento.paths import (
+        describe_platform, native_window_support, web_dir,
+    )
+
+    window_ok, window_detail = native_window_support()
+    exiftool = find_exiftool()
+    report = {
+        "version": __version__,
+        "platform": describe_platform(),
+        "frozen": is_frozen(),
+        "exiftool": str(exiftool) if exiftool else None,
+        "web_assets": (web_dir() / "index.html").is_file(),
+        "native_window": window_ok,
+        "native_window_detail": window_detail,
+    }
+    problems = []
+    if not report["exiftool"]:
+        problems.append("ExifTool is missing from this build")
+    if not report["web_assets"]:
+        problems.append("web assets are missing from this build")
+    if is_frozen() and not window_ok:
+        problems.append(f"no native window: {window_detail}")
+    report["problems"] = problems
+
+    rendered = json.dumps(report, indent=2)
+    print(rendered)
+    # A windowed build has no stdout at all, so the report is also written
+    # where the caller can read it. That is the only way a build can ask a
+    # packaged application whether it actually works.
+    if report_path is not None:
+        try:
+            report_path.write_text(rendered, encoding="utf-8")
+        except OSError:
+            pass
+    return 1 if problems else 0
+
+
 def main() -> None:
     args = sys.argv[1:]
+    if "--selftest" in args:
+        destination = None
+        for argument in args:
+            if argument.startswith("--report="):
+                destination = Path(argument.split("=", 1)[1])
+        try:
+            raise SystemExit(selftest(destination))
+        except SystemExit:
+            raise
+        except BaseException as exc:          # noqa: BLE001
+            # A windowed build has no console, so an exception here would
+            # be invisible and the build would only see a bare exit code.
+            # The report is the only channel there is.
+            import json
+            import traceback
+
+            if destination is not None:
+                try:
+                    destination.write_text(json.dumps({
+                        "version": __version__,
+                        "problems": [f"self test raised {type(exc).__name__}: {exc}"],
+                        "traceback": traceback.format_exc(),
+                    }, indent=2), encoding="utf-8")
+                except OSError:
+                    pass
+            raise SystemExit(1)
     ports = [int(a) for a in args if a.isdigit()]
     port = ports[0] if ports else free_port()
     mode = choose_mode(args)
