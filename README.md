@@ -66,6 +66,42 @@ a pixel change.
 | **Reprofile** | Everything Plausible does, then adopts a different, internally consistent camera identity. |
 | **Clean** | Removes every tag not needed to render the image. Maximally private, and visibly scrubbed. |
 
+## Camera identities
+
+**Reprofile** adopts a different camera identity, and the picker is grouped
+into two kinds.
+
+**Plausible** — iPhone 15 Pro, iPhone 13, Pixel 8, Galaxy S23. Every field
+agrees with every other, so the file reads as an ordinary photo.
+
+**Novelty** — Game Boy Camera, a 1949 toaster, a dream you had once, a
+potato, an oatmeal-tin pinhole, and the Hubble Space Telescope. These are
+absurd about *which* camera they claim and rigorous about everything else:
+the numeric fields stay real numbers, so the output still passes all four
+gates and still opens everywhere.
+
+Several are more real than they sound. The Game Boy Camera genuinely used a
+Mitsubishi M64282FP sensor at 128x128 and f/2.0. A pinhole genuinely works
+out to about f/180. Hubble genuinely is 57.6 metres at f/24. Each one
+explains itself under the picker.
+
+The consistency panel *will* flag a novelty identity, and that is correct:
+claiming a Game Boy took your `IMG_0942.HEIC` is meant to be obviously
+untrue. The note says so, so a warning does not read as a bug.
+
+## Doing another file
+
+Three ways, whichever is nearest:
+
+- **Load another** in the header, at any time
+- **Clean another file** in the verification panel, once a write finishes
+- **Drop a file anywhere on the window** — the whole page is a drop target
+  once the start panel is gone
+
+Picking the same file twice works too, which needs saying because it is a
+common bug: the input is cleared after each pick so the browser still fires
+a change event.
+
 ## Reading the metadata
 
 Every field is shown with two sentences in plain English: what it is, and
