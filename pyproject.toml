@@ -1,0 +1,48 @@
+[project]
+name = "pentimento"
+dynamic = ["version"]
+description = "See what your photos are telling people, then decide what they keep saying."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["exif", "metadata", "privacy", "photography", "gps", "heic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Security",
+]
+dependencies = ["flask>=3.0", "pywebview>=5.0"]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0", 'pythonnet>=3.0; sys_platform == "win32"']
+test = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/Bebop-systems/pentimento"
+Issues = "https://github.com/Bebop-systems/pentimento/issues"
+Changelog = "https://github.com/Bebop-systems/pentimento/blob/main/CHANGELOG.md"
+
+[project.scripts]
+pentimento = "pentimento.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.dynamic]
+version = { attr = "pentimento.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pentimento = ["../../web/*"]
