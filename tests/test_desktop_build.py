@@ -3,6 +3,7 @@
 These do not run a build. They pin the decisions a build depends on, so a
 change that would quietly produce a broken app fails here first.
 """
+import importlib.util
 import struct
 from pathlib import Path
 
@@ -79,6 +80,24 @@ def test_icon_renders_deterministically():
     assert render(32) == render(32)
 
 
-def test_build_check_reports_readiness():
+def test_build_check_reports_problems_as_actionable_strings():
+    """What check() returns is testable anywhere; whether this particular
+    machine can build is not a property of the code."""
     from desktop.build import check
-    assert check() == [], "this checkout cannot produce a build"
+
+    problems = check()
+    assert isinstance(problems, list)
+    assert all(isinstance(p, str) and p for p in problems)
+    # Every problem has to say how to fix it, since it is read by someone
+    # who just wants a build.
+    assert all(("install" in p.lower() or "missing" in p.lower()
+                or "run " in p.lower()) for p in problems), problems
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("PyInstaller") is None,
+    reason="build tooling not installed; see requirements-build.txt",
+)
+def test_a_build_machine_reports_ready():
+    from desktop.build import check
+    assert check() == [], "build tooling is installed but check() objects"
