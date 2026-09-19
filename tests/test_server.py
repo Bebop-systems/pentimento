@@ -191,17 +191,67 @@ def test_apply_saves_to_a_findable_path(client, sample_heic):
     assert result["saved_name"].endswith(".HEIC")
 
 
-def test_repeated_writes_do_not_overwrite_each_other(client, sample_heic):
+def test_repeated_writes_overwrite_by_default(client, sample_heic):
+    """The default is a stable filename, not a growing pile of _2, _3, _4."""
     from pathlib import Path
     session = _upload(client, sample_heic).get_json()["session"]
     paths = []
-    for _ in range(2):
+    for _ in range(3):
         result = client.post("/api/apply", json={
             "session": session, "preset": "plausible"
         }).get_json()
         paths.append(Path(result["saved_path"]))
-    assert paths[0] != paths[1]
-    assert all(p.is_file() for p in paths)
+    assert len(set(paths)) == 1
+    assert paths[0].is_file()
+    assert len(list(paths[0].parent.iterdir())) == 1
+
+
+def test_numbering_can_be_switched_on(client, sample_heic):
+    from pathlib import Path
+    session = _upload(client, sample_heic).get_json()["session"]
+    paths = []
+    for _ in range(3):
+        result = client.post("/api/apply", json={
+            "session": session, "preset": "plausible", "on_collision": "number",
+        }).get_json()
+        paths.append(Path(result["saved_path"]))
+    assert len(set(paths)) == 3
+    assert [p.name for p in paths] == [
+        "IMG_0942_clean.HEIC", "IMG_0942_clean_2.HEIC", "IMG_0942_clean_3.HEIC",
+    ]
+
+
+def test_a_sequenced_pattern_numbers_itself(client, sample_heic):
+    from pathlib import Path
+    session = _upload(client, sample_heic).get_json()["session"]
+    names = []
+    for _ in range(3):
+        result = client.post("/api/apply", json={
+            "session": session, "preset": "reprofile",
+            "profile": "gameboy-camera", "pattern": "GBCAM_{n:03}{ext}",
+        }).get_json()
+        names.append(Path(result["saved_path"]).name)
+    assert names == ["GBCAM_001.HEIC", "GBCAM_002.HEIC", "GBCAM_003.HEIC"]
+
+
+def test_a_bad_pattern_is_reported_not_written(client, sample_heic):
+    session = _upload(client, sample_heic).get_json()["session"]
+    preview = client.post("/api/preview", json={
+        "session": session, "preset": "plausible", "pattern": "{nonsense}{ext}",
+    }).get_json()
+    assert "nonsense" in preview["naming_error"]
+    assert client.post("/api/apply", json={
+        "session": session, "preset": "plausible", "pattern": "{nonsense}{ext}",
+    }).status_code == 400
+
+
+def test_presets_endpoint_advertises_the_naming_vocabulary(client):
+    data = client.get("/api/presets").get_json()
+    assert data["default_pattern"] == "{stem}_clean{ext}"
+    assert data["default_collision"] == "overwrite"
+    assert "stem" in data["tokens"] and "n" in data["tokens"]
+    assert set(data["collision_modes"]) == {"overwrite", "number", "timestamp"}
+    assert data["patterns"]["gameboy-camera"] == "GBCAM_{n:03}{ext}"
 
 
 def test_presets_endpoint_groups_credible_and_novelty_profiles(client):
@@ -223,11 +273,22 @@ def test_novelty_reprofile_writes_and_verifies(client, sample_heic):
     assert all(g["ok"] for g in result["gates"])
 
 
-def test_novelty_identity_is_flagged_as_inconsistent(client, sample_heic):
+def test_keeping_the_original_name_is_flagged(client, sample_heic):
     """Claiming a Game Boy took an IMG_*.HEIC should be reported, not hidden."""
     session = _upload(client, sample_heic).get_json()["session"]
     data = client.post("/api/preview", json={
         "session": session, "preset": "reprofile", "profile": "gameboy-camera",
+        "pattern": "{stem}{ext}",
     }).get_json()
-    rules = {f["rule"] for f in data["findings"]}
-    assert "filename_mismatch" in rules
+    assert {f["rule"] for f in data["findings"]} >= {"filename_mismatch"}
+
+
+def test_the_camera_own_naming_clears_the_warning(client, sample_heic):
+    """Naming the output the way that camera would resolves the mismatch."""
+    session = _upload(client, sample_heic).get_json()["session"]
+    data = client.post("/api/preview", json={
+        "session": session, "preset": "reprofile", "profile": "gameboy-camera",
+        "pattern": "GBCAM_{n:03}{ext}",
+    }).get_json()
+    assert data["output_name"] == "GBCAM_001.HEIC"
+    assert "filename_mismatch" not in {f["rule"] for f in data["findings"]}

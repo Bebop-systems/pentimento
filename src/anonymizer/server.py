@@ -11,7 +11,7 @@ import mimetypes
 import shutil
 import tempfile
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_file
@@ -23,6 +23,10 @@ from .explanations import CATEGORY_SUMMARY, explain
 from .inspect import read_tags
 from .linter import lint
 from .model import EditPlan, TagSet
+from .naming import (
+    COLLISION_MODES, DEFAULT_COLLISION, DEFAULT_PATTERN, TOKENS,
+    Naming, NamingError, build_values,
+)
 from .payload import container_of
 from .presets import PRESETS, build_plan, plan_from_edits
 from .profiles import CREDIBLE_KEYS, NOVELTY_KEYS, PROFILES
@@ -78,17 +82,6 @@ class SessionStore:
 
     def cleanup(self) -> None:
         shutil.rmtree(self.root, ignore_errors=True)
-
-
-def _unique_name(out_dir: Path, source_name: str) -> str:
-    """A fresh filename in the output folder, never overwriting an earlier run."""
-    stem, suffix = Path(source_name).stem, Path(source_name).suffix
-    candidate = f"{stem}_clean{suffix}"
-    counter = 2
-    while (out_dir / candidate).exists():
-        candidate = f"{stem}_clean_{counter}{suffix}"
-        counter += 1
-    return candidate
 
 
 def _serve_asset(filename: str):
@@ -191,6 +184,21 @@ def _diff_payload(before: TagSet, after: TagSet) -> list[dict]:
     return rows
 
 
+def _naming(body: dict) -> Naming:
+    return Naming(
+        pattern=(body.get("pattern") or DEFAULT_PATTERN).strip(),
+        on_collision=body.get("on_collision") or DEFAULT_COLLISION,
+    )
+
+
+def _naming_values(session: Session, body: dict) -> dict:
+    return build_values(
+        session.source,
+        body.get("preset") or "manual",
+        body.get("profile") or "",
+    )
+
+
 def _build(session: Session, body: dict) -> EditPlan:
     preset = body.get("preset") or "manual"
     options = {
@@ -252,6 +260,11 @@ def create_app(
             },
             "credible": list(CREDIBLE_KEYS),
             "novelty": list(NOVELTY_KEYS),
+            "patterns": {k: p.filename_pattern for k, p in PROFILES.items()},
+            "tokens": TOKENS,
+            "collision_modes": COLLISION_MODES,
+            "default_pattern": DEFAULT_PATTERN,
+            "default_collision": DEFAULT_COLLISION,
         })
 
     @app.post("/api/upload")
@@ -305,12 +318,26 @@ def create_app(
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         pending = session.tagset.with_plan(plan)
+
+        naming, name, naming_error = _naming(body), "", ""
+        try:
+            name = naming.preview(_naming_values(session, body))
+        except NamingError as exc:
+            naming_error = str(exc)
+
+        # Lint the file as it will exist, named as it will be named. A
+        # Pixel photo still called IMG_0942 contradicts itself, and that
+        # warning should clear once the name follows the camera.
+        judged = replace(pending, path=Path(name)) if name else pending
+
         return jsonify({
             "tags": _tag_payload(pending),
             "categories": _category_payload(pending),
-            "findings": _findings_payload(pending),
+            "findings": _findings_payload(judged),
             "diff": _diff_payload(session.tagset, pending),
             "args": plan.to_args(),
+            "output_name": name,
+            "naming_error": naming_error,
         })
 
     @app.post("/api/apply")
@@ -326,7 +353,10 @@ def create_app(
 
         out_dir = app.config["OUTPUT_DIR"]
         out_dir.mkdir(parents=True, exist_ok=True)
-        output = out_dir / _unique_name(out_dir, session.source.name)
+        try:
+            output = _naming(body).resolve(out_dir, _naming_values(session, body))
+        except NamingError as exc:
+            return jsonify({"error": str(exc)}), 400
         try:
             report = apply_plan(get_engine(), session.source, output, plan)
         except Exception as exc:
