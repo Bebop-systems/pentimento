@@ -23,6 +23,18 @@ python run.py 8731                   # or pick the port yourself
 python run.py --no-browser
 ```
 
+## Where your cleaned file goes
+
+Every verified copy is written to `output/` next to this README, named after
+the original with `_clean` appended, and the full path is shown on screen
+with a **Copy path** button. Nothing is ever overwritten: a second run of
+the same file becomes `_clean_2`.
+
+A browser download is offered too, but the file on disk is the reliable
+one. Browser downloads can land somewhere you will not find, or be
+intercepted by a security policy, which is exactly what happened during
+testing.
+
 ## What it does
 
 Your original file is never modified. Every write goes to a copy, and that
@@ -53,6 +65,21 @@ a pixel change.
 | **Plausible** | Keeps a coherent camera identity. Drops location, serials, faces, captions and embedded thumbnails, the way a phone with location services off would present. |
 | **Reprofile** | Everything Plausible does, then adopts a different, internally consistent camera identity. |
 | **Clean** | Removes every tag not needed to render the image. Maximally private, and visibly scrubbed. |
+
+## Reading the metadata
+
+Every field is shown with two sentences in plain English: what it is, and
+what someone inspecting your file learns from it. A tag list is only useful
+if you know what the tags mean, and almost nobody does.
+
+Fields are grouped into cards - Location, Device, Content, Time, Software,
+Embedded, Technical - each with a count and a one-line summary. Clicking a
+card shows just those fields, so you are never scrolling one long
+undifferentiated list.
+
+Values in the identifying categories start blurred and reveal on click, or
+all at once with **Reveal values**. Your own coordinates should not be on
+screen by accident during a screen share.
 
 ## The consistency linter
 
@@ -86,6 +113,18 @@ the input's format and extension.
 The payload gate understands ISO-BMFF, JPEG, PNG and TIFF. For anything
 else it reports "payload unverified" rather than claiming a guarantee it
 cannot make.
+
+## Appearance
+
+The interface is built on the **GeoDzk** design system, using its tokens,
+panels, trust chips, engraved surfaces and sealed-value pattern. Dark is the
+default; the control in the header cycles dark, light, and both
+high-contrast themes, and the choice is remembered per browser.
+
+`web/geodzk.css` is a verbatim copy of the system's stylesheet and should be
+replaced rather than edited. Everything specific to this app lives in
+`web/app.css` and only ever references the system's tokens, so all four
+themes keep working.
 
 ## Tests
 

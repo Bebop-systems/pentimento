@@ -31,3 +31,6 @@ htmlcov/
 .playwright-mcp/
 *.png
 !web/**/*.png
+
+# Verified output files
+output/
