@@ -34,3 +34,8 @@ htmlcov/
 
 # Verified output files
 output/
+
+# Build output
+dist/
+build/
+*.spec.bak

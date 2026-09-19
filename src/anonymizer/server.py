@@ -23,6 +23,7 @@ from .explanations import CATEGORY_SUMMARY, explain
 from .inspect import read_tags
 from .linter import lint
 from .model import EditPlan, TagSet
+from .paths import default_output_dir, web_dir
 from .naming import (
     COLLISION_MODES, DEFAULT_COLLISION, DEFAULT_PATTERN, TOKENS,
     Naming, NamingError, build_values,
@@ -32,14 +33,15 @@ from .presets import PRESETS, build_plan, plan_from_edits
 from .profiles import CREDIBLE_KEYS, NOVELTY_KEYS, PROFILES
 from .sensitivity import RISK_ORDER, Category, classify
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-WEB_DIR = PROJECT_ROOT / "web"
+# Resolved through paths so a packaged app finds its own files and writes
+# somewhere it is actually allowed to.
+WEB_DIR = web_dir()
 
 # Verified output is written here as well as offered as a download. A browser
 # download can land somewhere the operator cannot find, or be swallowed
 # entirely by a security policy; a path on disk they can read off the screen
 # always works.
-OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR = default_output_dir()
 
 # A browser will send whatever Host a malicious page names. Restricting it
 # to loopback stops DNS rebinding from reaching this server through a tab
@@ -227,8 +229,14 @@ def create_app(
     def get_engine() -> ExifToolEngine:
         current = app.config.get("ENGINE")
         if current is None:
-            from scripts.fetch_exiftool import ensure_exiftool
-            current = ExifToolEngine(ensure_exiftool()).start()
+            from .paths import find_exiftool
+            binary = find_exiftool()
+            if binary is None:
+                # Only a source checkout may reach out to the network; a
+                # packaged app ships with its own copy or has a real fault.
+                from scripts.fetch_exiftool import ensure_exiftool
+                binary = ensure_exiftool()
+            current = ExifToolEngine(binary).start()
             app.config["ENGINE"] = current
         return current
 

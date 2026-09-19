@@ -1,73 +1,100 @@
 """Fetch the pinned ExifTool build into vendor/.
 
-ExifTool's Windows builds are hosted on SourceForge. The GitHub repo
-publishes tags but no release assets, and exiftool.org links out rather
-than serving the zip itself, so neither works as a download source.
+ExifTool's downloads are hosted on SourceForge. The GitHub repo publishes
+tags but no release assets, and exiftool.org links out rather than serving
+the archive itself, so neither works as a source.
+
+Windows gets the standalone build, which carries its own Perl. Everything
+else gets the plain distribution, which is a Perl script plus its library
+and runs on the system Perl that macOS and Linux already ship.
 """
 from __future__ import annotations
 
 import io
 import os
+import shutil
 import sys
+import tarfile
 import urllib.request
 import zipfile
 from pathlib import Path
 
-EXIFTOOL_VERSION = "13.59"
-DOWNLOAD_URL = (
-    "https://sourceforge.net/projects/exiftool/files/"
-    f"exiftool-{EXIFTOOL_VERSION}_64.zip/download"
+sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "src")]
+
+from anonymizer.paths import (  # noqa: E402
+    PROJECT_ROOT, VENDOR_NAME, find_exiftool as _find,
 )
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-VENDOR_DIR = PROJECT_ROOT / "vendor"
+
+EXIFTOOL_VERSION = "13.59"
+VENDOR_DIR = PROJECT_ROOT / VENDOR_NAME
+
+_BASE = "https://sourceforge.net/projects/exiftool/files"
+WINDOWS_URL = f"{_BASE}/exiftool-{EXIFTOOL_VERSION}_64.zip/download"
+GENERIC_URL = f"{_BASE}/Image-ExifTool-{EXIFTOOL_VERSION}.tar.gz/download"
+
+
+def download_url() -> str:
+    return WINDOWS_URL if os.name == "nt" else GENERIC_URL
 
 
 def find_exiftool() -> Path | None:
-    """Return the vendored exiftool binary, or None if not yet fetched."""
-    if not VENDOR_DIR.exists():
-        return None
-    for name in ("exiftool.exe", "exiftool(-k).exe", "exiftool"):
-        for candidate in VENDOR_DIR.rglob(name):
-            if candidate.is_file():
-                return candidate
-    return None
+    """Kept for callers and tests that import it from here."""
+    return _find(VENDOR_DIR)
+
+
+def _fetch(url: str) -> bytes:
+    request = urllib.request.Request(url, headers={"User-Agent": "anonymizer-setup"})
+    print(f"Downloading ExifTool {EXIFTOOL_VERSION} ...", file=sys.stderr)
+    with urllib.request.urlopen(request, timeout=300) as response:
+        return response.read()
 
 
 def download() -> Path:
     """Download and extract ExifTool. Returns the binary path."""
     VENDOR_DIR.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(
-        DOWNLOAD_URL, headers={"User-Agent": "anonymizer-setup"}
-    )
-    print(f"Downloading ExifTool {EXIFTOOL_VERSION} ...", file=sys.stderr)
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        blob = resp.read()
-    if not blob.startswith(b"PK\x03\x04"):
-        raise RuntimeError(
-            f"Expected a zip, got {len(blob)} bytes starting {blob[:16]!r}"
-        )
-    with zipfile.ZipFile(io.BytesIO(blob)) as zf:
-        zf.extractall(VENDOR_DIR)
+    blob = _fetch(download_url())
 
-    # The standalone build ships as exiftool(-k).exe, which pauses for a
+    if blob[:4] == b"PK\x03\x04":
+        with zipfile.ZipFile(io.BytesIO(blob)) as archive:
+            archive.extractall(VENDOR_DIR)
+    elif blob[:2] == b"\x1f\x8b":
+        with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as archive:
+            # filter="data" refuses absolute paths and traversal, which is
+            # the documented safe extraction mode from Python 3.12 on.
+            archive.extractall(VENDOR_DIR, filter="data")
+        for extracted in VENDOR_DIR.glob(f"Image-ExifTool-{EXIFTOOL_VERSION}"):
+            script = extracted / "exiftool"
+            if script.is_file():
+                script.chmod(0o755)
+    else:
+        raise RuntimeError(
+            f"Expected an archive, got {len(blob)} bytes starting {blob[:16]!r}"
+        )
+
+    # The Windows standalone ships as exiftool(-k).exe, which pauses for a
     # keypress on exit. Renaming disables that.
     for k_exe in VENDOR_DIR.rglob("exiftool(-k).exe"):
         k_exe.rename(k_exe.with_name("exiftool.exe"))
 
-    exe = find_exiftool()
-    if exe is None:
+    binary = find_exiftool()
+    if binary is None:
         raise RuntimeError("Extraction succeeded but no binary was found")
-    os.chmod(exe, 0o755)
-    return exe
+    if os.name != "nt":
+        binary.chmod(0o755)
+    return binary
 
 
 def ensure_exiftool() -> Path:
     """Return the vendored binary, downloading it if absent."""
     existing = find_exiftool()
-    if existing is not None:
-        return existing
-    return download()
+    return existing if existing is not None else download()
+
+
+def clean() -> None:
+    shutil.rmtree(VENDOR_DIR, ignore_errors=True)
 
 
 if __name__ == "__main__":
+    if "--clean" in sys.argv:
+        clean()
     print(ensure_exiftool())

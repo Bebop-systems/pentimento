@@ -8,7 +8,22 @@ provably unchanged.
 Nothing leaves your machine. There is no account, no upload, and no network
 call after first-run setup.
 
-## Setup
+## Install it as an application
+
+```bash
+python desktop/build.py --zip
+```
+
+Produces `dist/MetadataEditor/` with a double-clickable `MetadataEditor.exe`
+(or `Metadata Editor.app` on macOS) and a zip to pass to someone else. It
+opens its own window rather than a browser tab, and bundles ExifTool, so the
+machine it runs on needs nothing installed.
+
+No browser is bundled and none is needed: the window is drawn by Edge
+WebView2 on Windows and WKWebView on macOS, both supplied by the operating
+system. See `docs/PACKAGING.md`.
+
+## Setup (from source)
 
 ```bash
 python scripts/fetch_exiftool.py     # one time: downloads ExifTool 13.59
@@ -23,9 +38,10 @@ python run.py 8731                   # or pick the port yourself
 python run.py --no-browser
 ```
 
-Run it from your own terminal and leave that window open. The server
-lives for as long as the shell that started it, so starting it from
-somebody else's session ends when that session does.
+Run it from your own terminal and leave that window open. The server lives
+for as long as the shell that started it, so starting it from somebody
+else's session ends when that session does. The packaged application has no
+such problem: closing its window stops the server.
 
 ## Where your cleaned file goes
 
