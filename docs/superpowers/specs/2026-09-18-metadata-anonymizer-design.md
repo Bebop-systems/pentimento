@@ -1,3 +1,7 @@
+> **Historical note.** These documents were written while the project
+> was called `anonymizer`. The package was renamed to `pentimento`
+> before the first public release; paths below reflect the old name.
+
 # Photo Metadata Anonymizer — Design
 
 **Date:** 2026-09-18

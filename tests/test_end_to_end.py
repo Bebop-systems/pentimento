@@ -5,12 +5,12 @@ project was found by running a real file through, not by unit tests.
 """
 import pytest
 
-from anonymizer.apply import apply_plan
-from anonymizer.inspect import read_tags
-from anonymizer.linter import lint
-from anonymizer.payload import payload_digest
-from anonymizer.presets import build_plan
-from anonymizer.profiles import PROFILES
+from pentimento.apply import apply_plan
+from pentimento.inspect import read_tags
+from pentimento.linter import lint
+from pentimento.payload import payload_digest
+from pentimento.presets import build_plan
+from pentimento.profiles import PROFILES
 
 PRESETS_UNDER_TEST = [
     ("plausible", {}),
@@ -120,7 +120,7 @@ def test_each_camera_profile_writes_a_self_consistent_identity(
 
 def test_a_failed_gate_leaves_no_output_behind(engine, sample_heic, tmp_path):
     """Changing Orientation breaks rendering, so nothing may be handed over."""
-    from anonymizer.model import EditOp, EditPlan
+    from pentimento.model import EditOp, EditPlan
 
     output = tmp_path / "broken.HEIC"
     report = apply_plan(

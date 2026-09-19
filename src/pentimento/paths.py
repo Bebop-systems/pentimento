@@ -74,7 +74,7 @@ def default_output_dir() -> Path:
     self-contained. Inside the user's Pictures folder when packaged,
     because an installed app cannot write next to itself.
     """
-    override = os.environ.get("ANONYMIZER_OUTPUT")
+    override = os.environ.get("PENTIMENTO_OUTPUT")
     if override:
         return Path(override).expanduser()
 
@@ -85,8 +85,8 @@ def default_output_dir() -> Path:
     for candidate in ("Pictures", "Documents"):
         folder = home / candidate
         if folder.is_dir():
-            return folder / "Metadata Editor"
-    return home / "Metadata Editor"
+            return folder / "Pentimento"
+    return home / "Pentimento"
 
 
 def describe_platform() -> str:

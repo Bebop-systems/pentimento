@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "src")]
 
-from anonymizer.paths import (  # noqa: E402
+from pentimento.paths import (  # noqa: E402
     PROJECT_ROOT, VENDOR_NAME, find_exiftool as _find,
 )
 
@@ -43,7 +43,7 @@ def find_exiftool() -> Path | None:
 
 
 def _fetch(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "anonymizer-setup"})
+    request = urllib.request.Request(url, headers={"User-Agent": "pentimento-setup"})
     print(f"Downloading ExifTool {EXIFTOOL_VERSION} ...", file=sys.stderr)
     with urllib.request.urlopen(request, timeout=300) as response:
         return response.read()

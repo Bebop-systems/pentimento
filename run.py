@@ -16,7 +16,7 @@ if not getattr(sys, "frozen", False):
     ROOT = Path(__file__).resolve().parent
     sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 
-from anonymizer.__main__ import main  # noqa: E402
+from pentimento.__main__ import main  # noqa: E402
 
 if __name__ == "__main__":
     main()

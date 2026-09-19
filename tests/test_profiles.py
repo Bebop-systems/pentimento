@@ -8,7 +8,7 @@ import re
 
 import pytest
 
-from anonymizer.profiles import CREDIBLE_KEYS, NOVELTY_KEYS, PROFILES
+from pentimento.profiles import CREDIBLE_KEYS, NOVELTY_KEYS, PROFILES
 
 NUMERIC = ("focal_length", "f_number")
 

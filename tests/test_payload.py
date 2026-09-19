@@ -1,7 +1,7 @@
 import struct
 import zlib
 
-from anonymizer.payload import container_of, payload_digest
+from pentimento.payload import container_of, payload_digest
 
 
 def _box(typ: bytes, body: bytes) -> bytes:

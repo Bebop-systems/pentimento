@@ -1,8 +1,8 @@
 import pytest
 
-from anonymizer.explanations import CATEGORY_SUMMARY, explain
-from anonymizer.model import Tag
-from anonymizer.sensitivity import Category
+from pentimento.explanations import CATEGORY_SUMMARY, explain
+from pentimento.model import Tag
+from pentimento.sensitivity import Category
 
 
 @pytest.mark.parametrize("group,name", [

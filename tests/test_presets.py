@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from anonymizer.model import TagSet
-from anonymizer.presets import PRESETS, build_plan, plan_from_edits
-from anonymizer.profiles import PROFILES
+from pentimento.model import TagSet
+from pentimento.presets import PRESETS, build_plan, plan_from_edits
+from pentimento.profiles import PROFILES
 
 
 def _ts(name="a.heic", **kw):
@@ -117,8 +117,8 @@ def test_time_shift_days_are_days_not_years(engine, sample_heic, tmp_path):
     A real write is the only thing that catches this: the preview and the
     plan agreed with each other while both were wrong.
     """
-    from anonymizer.apply import apply_plan
-    from anonymizer.inspect import read_tags
+    from pentimento.apply import apply_plan
+    from pentimento.inspect import read_tags
 
     ts = read_tags(engine, sample_heic)
     before = str(ts.by_name("DateTimeOriginal").value)

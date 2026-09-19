@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from anonymizer.naming import (
+from pentimento.naming import (
     DEFAULT_COLLISION, DEFAULT_PATTERN, Naming, NamingError,
     build_values, render, safe_filename,
 )

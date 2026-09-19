@@ -1,7 +1,7 @@
 import pytest
 
-from anonymizer.model import Tag
-from anonymizer.sensitivity import RENDERING_CRITICAL, Category, classify
+from pentimento.model import Tag
+from pentimento.sensitivity import RENDERING_CRITICAL, Category, classify
 
 
 @pytest.mark.parametrize("group,name,expected", [

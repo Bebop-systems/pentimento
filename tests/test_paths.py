@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from anonymizer import paths
-from anonymizer.__main__ import choose_mode
+from pentimento import paths
+from pentimento.__main__ import choose_mode
 
 
 def test_source_checkout_resolves_beside_the_project():
@@ -28,16 +28,16 @@ def test_frozen_resources_come_from_meipass(monkeypatch, tmp_path):
 
 def test_frozen_output_is_somewhere_writable(monkeypatch):
     """A packaged app cannot write beside its own executable."""
-    monkeypatch.delenv("ANONYMIZER_OUTPUT", raising=False)
+    monkeypatch.delenv("PENTIMENTO_OUTPUT", raising=False)
     monkeypatch.setattr(paths.sys, "frozen", True, raising=False)
     output = paths.default_output_dir()
     assert paths.PROJECT_ROOT not in output.parents
     assert Path.home() in output.parents or output.parent == Path.home()
-    assert output.name == "Metadata Editor"
+    assert output.name == "Pentimento"
 
 
 def test_output_can_be_overridden(monkeypatch, tmp_path):
-    monkeypatch.setenv("ANONYMIZER_OUTPUT", str(tmp_path / "elsewhere"))
+    monkeypatch.setenv("PENTIMENTO_OUTPUT", str(tmp_path / "elsewhere"))
     assert paths.default_output_dir() == tmp_path / "elsewhere"
 
 
@@ -69,6 +69,6 @@ def test_find_exiftool_prefers_a_direct_hit(tmp_path):
 ])
 def test_launch_mode(monkeypatch, args, frozen, expected):
     monkeypatch.setattr(paths, "is_frozen", lambda: frozen)
-    import anonymizer.__main__ as entry
+    import pentimento.__main__ as entry
     monkeypatch.setattr(entry, "is_frozen", lambda: frozen)
     assert choose_mode(args) == expected

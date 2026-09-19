@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    # macOS is written but unverified, so it reports without blocking.
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.13"
+          - os: macos-latest
+            python: "3.13"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip -r requirements.txt
+
+      - name: Cache ExifTool
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: exiftool-${{ runner.os }}-13.59
+
+      - name: Fetch ExifTool
+        run: python scripts/fetch_exiftool.py
+
+      - name: Run tests
+        run: python -m pytest -q

@@ -1,0 +1,98 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows application
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller pywebview pythonnet
+
+      - name: Fetch ExifTool
+        run: python scripts/fetch_exiftool.py
+
+      - name: Refuse a tag that disagrees with the source
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          source_version="$(python scripts/set_version.py)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "source: $source_version   tag: $tag_version"
+          if [ "$source_version" != "$tag_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version"                  "$source_version. Run scripts/set_version.py and commit"                  "before tagging."
+            exit 1
+          fi
+
+      - name: Run tests before shipping
+        run: python -m pytest -q
+
+      - name: Install Inno Setup
+        run: winget install --id JRSoftware.InnoSetup --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+        continue-on-error: true
+
+      - name: Build application, archive and installer
+        run: python desktop/build.py --zip --installer
+
+      - name: Name the archive after the version
+        shell: bash
+        run: |
+          version="$(python scripts/set_version.py)"
+          mv dist/Pentimento-windows.zip "dist/Pentimento-${version}-windows-portable.zip"
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pentimento-windows
+          path: |
+            dist/Pentimento-*-windows-portable.zip
+            dist/Pentimento-*-windows-setup.exe
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Pentimento-*-windows-setup.exe
+            dist/Pentimento-*-windows-portable.zip
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Most people want the installer** — download
+            `Pentimento-*-windows-setup.exe`, run it, and Pentimento appears
+            in the Start menu. It installs per user, so there is no
+            administrator prompt, and it uninstalls from Add or Remove
+            Programs.
+
+            **Prefer portable?** The `-portable.zip` unzips to a folder you
+            can run from anywhere, including a USB stick.
+
+            There is deliberately no single self-extracting executable: one
+            would unpack hundreds of files into your temp folder and run
+            them from there on every launch, which is behaviour worth
+            avoiding on a managed machine.
+
+            This build is not code signed, so Windows warns on first run:
+            **More info → Run anyway**.
+
+            Deploying to a fleet? See
+            [docs/DEPLOYMENT.md](https://github.com/Bebop-systems/pentimento/blob/main/docs/DEPLOYMENT.md).
+
+            macOS is written but not yet verified on a Mac.

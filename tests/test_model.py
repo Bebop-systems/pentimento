@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from anonymizer.model import EditOp, EditPlan, Tag, TagSet
+from pentimento.model import EditOp, EditPlan, Tag, TagSet
 
 
 def test_tag_key_joins_group_and_name():

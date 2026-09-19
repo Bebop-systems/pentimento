@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from anonymizer.linter import lint
-from anonymizer.model import TagSet
+from pentimento.linter import lint
+from pentimento.model import TagSet
 
 
 def _ts(name="a.heic", **kw):
@@ -136,7 +136,7 @@ def test_warnings_sort_before_notes():
 
 def test_reprofiling_to_another_vendor_flags_the_filename():
     """An IMG_*.HEIC claiming Google is the tell the linter exists to catch."""
-    from anonymizer.model import EditOp, EditPlan
+    from pentimento.model import EditOp, EditPlan
     m = {"IFD0:Make": "Apple", "IFD0:Model": "iPhone 13 Pro Max"}
     ts = TagSet.from_exiftool(Path("IMG_0942.HEIC"), m, m)
     pending = ts.with_plan(EditPlan([

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from anonymizer.inspect import read_tags
+from pentimento.inspect import read_tags
 
 
 class FakeEngine:

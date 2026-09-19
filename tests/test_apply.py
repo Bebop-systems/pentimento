@@ -1,9 +1,9 @@
 import pytest
 
-from anonymizer.apply import apply_plan
-from anonymizer.inspect import read_tags
-from anonymizer.model import EditOp, EditPlan
-from anonymizer.payload import payload_digest
+from pentimento.apply import apply_plan
+from pentimento.inspect import read_tags
+from pentimento.model import EditOp, EditPlan
+from pentimento.payload import payload_digest
 
 
 @pytest.fixture

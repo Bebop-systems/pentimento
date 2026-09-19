@@ -5,9 +5,9 @@ python desktop/build.py --check      # is this machine ready
 python desktop/build.py --zip        # build, then archive it
 ```
 
-The result is `dist/MetadataEditor/` with `MetadataEditor.exe` at the top,
-plus `dist/MetadataEditor-windows.zip` to hand to someone else. On macOS the
-same command produces `dist/Metadata Editor.app`.
+The result is `dist/Pentimento/` with `Pentimento.exe` at the top,
+plus `dist/Pentimento-windows.zip` to hand to someone else. On macOS the
+same command produces `dist/Pentimento.app`.
 
 Build on the platform you are shipping to. PyInstaller freezes the
 interpreter running it, so it cannot cross-compile.
@@ -57,7 +57,7 @@ macOS Gatekeeper will refuse a downloaded unsigned app outright; right-click
 and Open, or clear it with:
 
 ```bash
-xattr -dr com.apple.quarantine "dist/Metadata Editor.app"
+xattr -dr com.apple.quarantine "dist/Pentimento.app"
 ```
 
 Signing is the only real fix, and it costs money on both platforms.
@@ -65,14 +65,14 @@ Signing is the only real fix, and it costs money on both platforms.
 ## What changes inside a bundle
 
 Two assumptions from running out of a checkout stop holding, and
-`src/anonymizer/paths.py` is where both are handled.
+`src/pentimento/paths.py` is where both are handled.
 
 **Files move.** PyInstaller unpacks to its own directory, so `web/` and
 `vendor/` are found through `resource_dir()` rather than beside the module.
 
 **The app folder is read-only.** Output cannot be written next to the
-executable, so a packaged build writes to `~/Pictures/Metadata Editor`. From
-a checkout it stays in `output/`. `ANONYMIZER_OUTPUT` overrides both.
+executable, so a packaged build writes to `~/Pictures/Pentimento`. From
+a checkout it stays in `output/`. `PENTIMENTO_OUTPUT` overrides both.
 
 A packaged app also never downloads ExifTool. If its bundled copy is missing
 that is a broken build, not something to paper over at runtime.

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from anonymizer.engine import ExifToolEngine
+from pentimento.engine import ExifToolEngine
 from scripts.fetch_exiftool import find_exiftool
 
 SAMPLE_HEIC = Path(__file__).resolve().parent.parent / "IMG_0942.HEIC"
