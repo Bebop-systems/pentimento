@@ -3,7 +3,7 @@ import io
 import pytest
 from werkzeug.test import EnvironBuilder
 
-from anonymizer.server import create_app
+from pentimento.server import create_app
 
 
 @pytest.fixture
@@ -292,3 +292,11 @@ def test_the_camera_own_naming_clears_the_warning(client, sample_heic):
     }).get_json()
     assert data["output_name"] == "GBCAM_001.HEIC"
     assert "filename_mismatch" not in {f["rule"] for f in data["findings"]}
+
+
+def test_about_reports_version_and_links(client):
+    about = client.get("/api/presets").get_json()["about"]
+    assert about["version"]
+    assert about["repo"].startswith("https://github.com/")
+    assert about["releases"].endswith("/releases/latest")
+    assert about["issues"].endswith("/issues")

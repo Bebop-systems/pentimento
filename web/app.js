@@ -100,6 +100,8 @@ async function loadPresets() {
   }
   collision.value = state.collision;
 
+  if (data.about) renderColophon(data.about);
+
   $("pattern-help").textContent =
     "Tokens: " + Object.keys(data.tokens).map((k) => `{${k}}`).join("  ") +
     ". A pattern containing {n} numbers itself, so it never overwrites.";
@@ -147,6 +149,18 @@ function renderOutputName(name, error) {
   $("collision").title = $("collision").disabled
     ? "A pattern with {n} picks the next free number, so nothing is overwritten."
     : "";
+}
+
+/* Version and where to look for a newer one.
+ *
+ * The links are inert until clicked, and clicking opens the operator's own
+ * browser. Nothing here fetches anything: an app that phones home on
+ * launch is what this tool promises not to be. */
+function renderColophon(about) {
+  $("version-label").textContent = `Pentimento ${about.version}`;
+  $("releases-link").href = about.releases;
+  $("repo-link").href = about.repo;
+  $("issues-link").href = about.issues;
 }
 
 function renderProfileNote() {

@@ -304,3 +304,18 @@ body.dragging::after {
 @media (prefers-reduced-motion: reduce) {
   .veil .veil-text { transition: none; }
 }
+
+/* ---------- colophon ---------------------------------------------------
+   Version and links, in the footer's quiet mono voice. Stated rather than
+   sold, next to the promise that nothing is fetched. */
+.colophon {
+  margin-top: var(--s4);
+  font: 500 11px/1.9 var(--font-mono);
+  letter-spacing: .05em;
+  color: var(--muted);
+  text-align: center;
+}
+.colophon a { color: var(--muted); text-decoration-color: var(--hair); }
+.colophon a:hover { color: var(--accent); }
+.colophon .sep { opacity: .4; margin: 0 4px; }
+.colophon-note { opacity: .65; }
