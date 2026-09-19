@@ -87,6 +87,25 @@ The short version, for an administrator skimming:
 └───────────────────────────────────────────────────────────────┘
 ```
 
+### Upgrading
+
+Run a newer installer. It finds the existing installation, replaces it in
+place and leaves one entry in Add or Remove Programs — no uninstall step, no
+duplicates. Your cleaned photos and settings are untouched either way,
+because neither lives in the program folder.
+
+If it finds an existing version it says so, and offers to install alongside
+instead. That gives the new copy its own uninstall entry, folder and Start
+menu group, so the two never collide.
+
+For simply trying a new version without disturbing the old one, the portable
+zip is tidier: it runs from any folder and writes nothing to the registry.
+The installer says so too, at the point you would choose.
+
+Each version's icon carries its own numbers, so two installed copies are
+distinguishable in the Start menu and the taskbar, and both the window title
+and the process description name the version in Task Manager.
+
 ### Why there is no single portable .exe
 
 A self-extracting build would unpack **737 files and 69 MB into `%TEMP%` on

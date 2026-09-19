@@ -196,6 +196,30 @@ setx PENTIMENTO_OUTPUT "%USERPROFILE%\Pentimento"
 Deploy that as an environment variable in the same Intune configuration
 profile as the application, and cleaned files stay local.
 
+## Upgrading an existing deployment
+
+The installer carries a fixed `AppId`, so a newer package replaces an older
+one in place: same directory, same single uninstall entry, no intervention.
+Verified rather than assumed — installing a newer build over an older one
+reuses the original location even when it was customised with `/DIR`.
+
+That means Intune **supersedence** works as expected against the version
+detection rule above. No uninstall step is needed in the supersedence
+configuration.
+
+If you need two versions on one machine, for a pilot ring beside a stable
+one, add `/PARALLEL=yes` to the install command. The second copy takes its
+own AppId, directory, Start menu group and uninstall entry, so removing
+either leaves the other intact. Its detection key gains a version suffix:
+
+```
+{7B2F5A64-9C3E-4D18-9A6F-2E5C1D0B7A43}_<version>_is1
+```
+
+Either way the two copies are told apart on screen: the icon carries the
+version numbers, and the window title and process description both name it,
+so Task Manager and any endpoint process inventory show which is which.
+
 ## Supersedence and updates
 
 The application never checks for updates. It shows its version and a link to
