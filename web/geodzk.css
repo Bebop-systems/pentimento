@@ -1,0 +1,1074 @@
+/* ===========================================================================
+   geodzk — Lantern (user plane) & Keep (admin plane)
+   One stylesheet, two skins, four themes each. No @import, no url(), no font
+   file, no build step: everything here survives `default-src 'none'` with a
+   per-response style nonce, which is the only policy this service will accept.
+
+   Read with handoff/SPEC.md. The color tokens in this file are a mirror of
+   handoff/theme_tokens.py — that file is the source of truth, because
+   tests/test_theme.py recomputes its contrast ratios on every run. If you
+   change a color, change it there and re-emit; do not edit hexes here alone.
+
+   Structure
+     1. Tokens that are not colors (type, space, radius, motion)
+     2. Color tokens, four themes, both planes
+     3. Base: reset, type, focus, the light source
+     4. Layout: wrap, header, panel, rules
+     5. Controls: inputs, buttons, the danger gradient
+     6. Data: tables, lists, pills, dots, meters, mono
+     7. The security language: sealed, provenance, engraved, trust, scope
+     8. Pages: sign-in, enrollment, notices, collection
+     9. The Keep — everything the admin plane does differently
+    10. Motion
+   =========================================================================== */
+
+/* --- 1. Non-colour tokens -------------------------------------------------
+   Type is three system stacks and nothing else. A webfont would mean a fetch,
+   a fetch means a CSP hole or a base64 payload on every response, and neither
+   is worth a typeface. The serif carries the human moments (a dead link, a
+   sign-in, a heading somebody reads once); the sans carries the interface; the
+   mono carries every label, timestamp, code and number. */
+:root, .gz {
+  --font-serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino,
+    "Book Antiqua", Charter, Georgia, "Times New Roman", serif;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Nocturne's 0.7 density, rounded to whole pixels. */
+  --s1: 4px;  --s2: 6px;  --s3: 8px;  --s4: 12px;
+  --s5: 16px; --s6: 24px; --s7: 32px; --s8: 48px;
+
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  --measure: 1060px;
+  --ease: cubic-bezier(.22,.61,.36,1);
+
+  /* Derived from the palette, so they retune with the theme rather than being
+     re-specified per skin. */
+  --hair: color-mix(in srgb, var(--line) 70%, transparent);
+  --lift: 0 1px 2px rgba(0,0,0,.18), 0 10px 28px -20px rgba(0,0,0,.55);
+  --lift-lg: 0 2px 4px rgba(0,0,0,.2), 0 22px 48px -28px rgba(0,0,0,.6);
+  --glow: color-mix(in srgb, var(--accent) 28%, transparent);
+  --tint: color-mix(in srgb, var(--accent) 12%, transparent);
+  --tint-strong: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* --- 2. Color tokens -----------------------------------------------------
+   Dark is the bare default so a page with no stored preference and no
+   JavaScript still renders correctly. The attribute selectors are deliberately
+   unqualified: in the app they land on :root, and in the reference pages they
+   land on a container, so one sheet serves both.
+
+   Every plane-specific value is prefixed --admin-*. Nothing else in the sheet
+   knows the admin plane exists: section 9 re-points --accent and friends once,
+   and the whole surface follows. */
+:root, .gz {
+  --bg: #110F0D;
+  --panel: #1A1715;
+  --raised: #221E1A;
+  --ink: #EDE6DB;
+  --muted: #A99C8C;
+  --line: #332E29;
+  --accent: #7DB9F2;
+  --accent-ink: #0A1220;
+  --danger: #FF9187;
+  --warn: #EEA94C;
+  --ok: #63C8A6;
+  --star: #EEA94C;
+  --grad-a: #110F0D;
+  --grad-b: #17130F;
+  --lamp: rgba(238,169,76,.16);          /* the light left on: warm, top right */
+  --admin-bg: #0F0B15;
+  --admin-panel: #17111F;
+  --admin-raised: #1F1729;
+  --admin-ink: #E9E2EE;
+  --admin-muted: #A99BBB;
+  --admin-line: #322A40;
+  --admin-accent: #C6A6F5;
+  --admin-accent-ink: #14081F;
+  --admin-grad-a: #0F0B15;
+  --admin-grad-b: #150F1E;
+  --admin-lamp: rgba(198,166,245,.10);   /* colder, dimmer, and off to the left */
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"], .gz[data-theme="system"] {
+    --bg: #F7F3EC; --panel: #FFFCF7; --raised: #EFE9DF; --ink: #211D19;
+    --muted: #5E564C; --line: #DED5C7; --accent: #0F5FBF; --accent-ink: #FFFCF7;
+    --danger: #A81E14; --warn: #7A5300; --ok: #0F633A; --star: #7A5300;
+    --grad-a: #F7F3EC; --grad-b: #F1EADD; --lamp: rgba(238,169,76,.20);
+    --admin-bg: #F6F2FA; --admin-panel: #FEFBFF; --admin-raised: #EEE8F5;
+    --admin-ink: #1E1826; --admin-muted: #574E63; --admin-line: #DBD2E5;
+    --admin-accent: #6B2FB8; --admin-accent-ink: #FEFBFF;
+    --admin-grad-a: #F6F2FA; --admin-grad-b: #EFE9F7; --admin-lamp: rgba(107,47,184,.10);
+  }
+}
+
+[data-theme="dark"] {
+  --bg: #110F0D; --panel: #1A1715; --raised: #221E1A; --ink: #EDE6DB;
+  --muted: #A99C8C; --line: #332E29; --accent: #7DB9F2; --accent-ink: #0A1220;
+  --danger: #FF9187; --warn: #EEA94C; --ok: #63C8A6; --star: #EEA94C;
+  --grad-a: #110F0D; --grad-b: #17130F; --lamp: rgba(238,169,76,.16);
+  --admin-bg: #0F0B15; --admin-panel: #17111F; --admin-raised: #1F1729;
+  --admin-ink: #E9E2EE; --admin-muted: #A99BBB; --admin-line: #322A40;
+  --admin-accent: #C6A6F5; --admin-accent-ink: #14081F;
+  --admin-grad-a: #0F0B15; --admin-grad-b: #150F1E; --admin-lamp: rgba(198,166,245,.10);
+}
+
+[data-theme="light"] {
+  --bg: #F7F3EC; --panel: #FFFCF7; --raised: #EFE9DF; --ink: #211D19;
+  --muted: #5E564C; --line: #DED5C7; --accent: #0F5FBF; --accent-ink: #FFFCF7;
+  --danger: #A81E14; --warn: #7A5300; --ok: #0F633A; --star: #7A5300;
+  --grad-a: #F7F3EC; --grad-b: #F1EADD; --lamp: rgba(238,169,76,.20);
+  --admin-bg: #F6F2FA; --admin-panel: #FEFBFF; --admin-raised: #EEE8F5;
+  --admin-ink: #1E1826; --admin-muted: #574E63; --admin-line: #DBD2E5;
+  --admin-accent: #6B2FB8; --admin-accent-ink: #FEFBFF;
+  --admin-grad-a: #F6F2FA; --admin-grad-b: #EFE9F7; --admin-lamp: rgba(107,47,184,.10);
+}
+
+/* High contrast is not "the dark theme, louder". Decoration is withdrawn: no
+   bloom, no glow, no tint fills, no shadow — every edge is a real 1px line at
+   full contrast, and every pair clears 7:1. */
+[data-theme="hc-dark"] {
+  --bg: #000000; --panel: #000000; --raised: #0A0A0A; --ink: #FFFFFF;
+  --muted: #E6E6E6; --line: #FFFFFF; --accent: #8FC6FF; --accent-ink: #000000;
+  --danger: #FFA8A0; --warn: #FFD166; --ok: #7DFFB0; --star: #FFD166;
+  --grad-a: #000000; --grad-b: #000000; --lamp: transparent;
+  --admin-bg: #000000; --admin-panel: #000000; --admin-raised: #0B0810;
+  --admin-ink: #FFFFFF; --admin-muted: #E6E6E6; --admin-line: #FFFFFF;
+  --admin-accent: #DCBCFF; --admin-accent-ink: #000000;
+  --admin-grad-a: #000000; --admin-grad-b: #000000; --admin-lamp: transparent;
+}
+
+[data-theme="hc-light"] {
+  --bg: #FFFFFF; --panel: #FFFFFF; --raised: #F2F2F2; --ink: #000000;
+  --muted: #1A1A1A; --line: #000000; --accent: #0031A8; --accent-ink: #FFFFFF;
+  --danger: #8E0000; --warn: #5C3F00; --ok: #00532B; --star: #5C3F00;
+  --grad-a: #FFFFFF; --grad-b: #FFFFFF; --lamp: transparent;
+  --admin-bg: #FFFFFF; --admin-panel: #FFFFFF; --admin-raised: #F2F2F2;
+  --admin-ink: #000000; --admin-muted: #1A1A1A; --admin-line: #000000;
+  --admin-accent: #4A007A; --admin-accent-ink: #FFFFFF;
+  --admin-grad-a: #FFFFFF; --admin-grad-b: #FFFFFF; --admin-lamp: transparent;
+}
+
+[data-theme="hc-dark"], [data-theme="hc-light"] {
+  --hair: var(--line);
+  --lift: none; --lift-lg: none;
+  --glow: transparent; --tint: transparent; --tint-strong: transparent;
+}
+
+/* --- 3. Base --------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body, .gz-page {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-ui);
+  position: relative;
+  isolation: isolate;
+}
+/* The viewport floor belongs to the page, not to the surface class. `.gz-page`
+   also names a *fragment* of a page in the reference documents, and floored to
+   100vh those fragments stop being sized by their content. */
+body { min-height: 100vh; }
+
+/* The gradient only ever touches the backdrop, never a surface text sits on,
+   so it cannot change a measured contrast ratio. */
+:root[data-bg="gradient"] body,
+.gz-page[data-bg="gradient"] {
+  background: linear-gradient(160deg, var(--grad-a) 0%, var(--grad-b) 100%) fixed;
+}
+
+/* The light source. Emberlight's one lit thing per screen, kept to the
+   backdrop and kept faint: a lamp in the corner of a dark room, not a
+   gradient. It is a pseudo-element so no markup carries it, it is
+   pointer-events:none so it cannot intercept a click, and --lamp resolves to
+   transparent in both high-contrast themes, which removes it outright. */
+body::before, .gz-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 34rem at 88% -8%, var(--lamp), transparent 70%),
+    radial-gradient(40rem 26rem at 6% 4%,
+      color-mix(in srgb, var(--accent) 6%, transparent), transparent 72%);
+  animation: gz-bloom 14s var(--ease) infinite;
+}
+
+a { color: var(--accent); text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* Focus is never removed, only replaced with something clearer: a solid ring
+   plus, outside high contrast, the accent's own bloom behind it. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 6px var(--glow);
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 10;
+  background: var(--accent); color: var(--accent-ink);
+  padding: 10px 16px; border-radius: 0 0 var(--r) 0; font-weight: 600;
+}
+.skip:focus { left: 0; }
+
+.sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+::selection { background: var(--tint-strong); }
+
+/* --- 4. Layout ------------------------------------------------------------- */
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 20px 20px 72px; }
+
+header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+header .spacer { flex: 1; }
+
+h1 {
+  font: 600 20px/1.2 var(--font-serif);
+  margin: 0; letter-spacing: -.01em;
+  display: inline-flex; align-items: center; gap: 9px;
+}
+h1 .sub {
+  font: 500 11px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .18em;
+  color: var(--muted); align-self: center; padding-top: 2px;
+}
+h1 .mark { display: inline-flex; color: var(--accent); line-height: 0; }
+.who { color: var(--muted); font: 500 12px/1 var(--font-mono); letter-spacing: .04em; }
+
+/* The panel: a hairline, a soft fill, a gentle lift. No colored left border,
+   no gradient inside, no second shadow. */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s5) var(--s5) 18px;
+  margin-bottom: var(--s4);
+  box-shadow: var(--lift);
+}
+
+/* Section headings are mono margin-notes, not titles: uppercase, widely
+   tracked, quiet. The content is the loud thing. */
+.panel > h2,
+details.panel > summary {
+  font: 500 11px/1.4 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .16em;
+  color: var(--muted);
+  margin: 0 0 var(--s4);
+  display: flex; align-items: center; gap: var(--s3); min-height: 24px;
+}
+.panel > h2 .right,
+details.panel > summary .note {
+  margin-left: auto; text-transform: none; letter-spacing: .02em;
+  font-weight: 400; color: var(--muted);
+}
+details.panel > summary { cursor: pointer; list-style: none; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after {
+  content: "›"; margin-left: var(--s3); font-size: 16px; line-height: 1;
+  transition: transform .18s var(--ease);
+}
+details.panel > summary .note + ::after { margin-left: var(--s3); }
+details.panel[open] > summary::after { transform: rotate(90deg); }
+details.panel[open] > summary { margin-bottom: var(--s5); }
+details.panel > summary:hover { color: var(--ink); }
+
+.ico { display: inline-flex; vertical-align: -3px; color: var(--muted); line-height: 0; }
+
+/* A rule that fades out at both ends rather than stopping — Nocturne's edge,
+   and the only horizontal rule this system draws. */
+.rule {
+  height: 1px; border: 0; margin: var(--s5) 0;
+  background: linear-gradient(to right, transparent, var(--hair) 48px,
+    var(--hair) calc(100% - 48px), transparent);
+}
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row > * { flex: 1 1 170px; }
+.row > .narrow { flex: 0 1 145px; }
+.row > .go { flex: 0 0 auto; }
+.stack > * + * { margin-top: var(--s4); }
+
+/* --- 5. Controls ----------------------------------------------------------- */
+label {
+  display: block;
+  font: 500 11px/1.4 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: 6px;
+}
+input, select, button, textarea { font: inherit; color: inherit; }
+input, select, textarea {
+  width: 100%; padding: 9px 11px; min-height: 40px;
+  background: var(--raised); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+input:hover, select:hover, textarea:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+input[type=checkbox] { width: 20px; height: 20px; min-height: 20px; accent-color: var(--accent); }
+input[type=search] { appearance: none; }
+
+/* Buttons are outlined by default — Nocturne's rule — and the one filled
+   button on a page is the thing you came to do. */
+button {
+  cursor: pointer; min-height: 40px; padding: 9px 14px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--raised); color: var(--ink);
+  font: 500 14px/1.2 var(--font-ui);
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  transition: border-color .15s var(--ease), color .15s var(--ease),
+    background .15s var(--ease), transform .12s var(--ease);
+}
+button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: .55; cursor: default; }
+
+button.primary {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+  font-weight: 650;
+}
+button.primary:hover:not(:disabled) {
+  color: var(--accent-ink); filter: brightness(1.08);
+  box-shadow: 0 0 0 4px var(--glow);
+}
+button.wide { width: 100%; }
+button.link {
+  border: 0; background: none; padding: 6px 8px; min-height: 36px; color: var(--muted);
+}
+button.link:hover { color: var(--accent); }
+button.link.danger:hover { color: var(--danger); }
+button.flush { padding-left: 0; padding-right: 0; }
+
+/* The danger gradient — three weights, three looks, in the order a person
+   meets them. A control's appearance states how far its consequence reaches:
+
+     (default)   reversible      quiet outline; undo exists
+     .cautious   consequential   warn outline, warn text; someone will notice
+     .grave      irreversible    danger outline over an engraved fill, and it
+                                 does not act alone — pair it with .confirmbar
+   Color is never the only carrier: .cautious and .grave both change their
+   border weight, and .grave carries the engraved hatch that marks every
+   irreversible surface in this system. */
+button.cautious {
+  border-color: var(--warn); color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, var(--raised));
+}
+button.cautious:hover:not(:disabled) {
+  border-color: var(--warn); color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, var(--raised));
+}
+button.grave {
+  border: 1.5px solid var(--danger); color: var(--danger); font-weight: 650;
+  background:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--danger) 12%, transparent) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--danger) 12%, transparent) 0 1px, transparent 1px 8px),
+    var(--raised);
+}
+button.grave:hover:not(:disabled) {
+  border-color: var(--danger); color: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+/* The typed confirmation that must accompany .grave. */
+.confirmbar {
+  display: flex; gap: var(--s3); flex-wrap: wrap; align-items: flex-end;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  border-radius: var(--r); padding: var(--s4);
+  background: color-mix(in srgb, var(--danger) 5%, var(--panel));
+}
+.confirmbar .grow { flex: 1 1 220px; }
+.confirmbar .why {
+  flex: 1 1 100%; margin: 0 0 2px; color: var(--ink); font-size: 13.5px;
+}
+.confirmbar input { font-family: var(--font-mono); }
+
+.scopes { display: flex; flex-wrap: wrap; gap: var(--s3); margin: var(--s3) 0 var(--s4); }
+.scopes label {
+  display: flex; align-items: center; gap: 7px; margin: 0; cursor: pointer;
+  min-height: 40px; padding: 8px 11px;
+  font: 500 12px/1 var(--font-mono); letter-spacing: .04em; text-transform: none;
+  color: var(--ink); background: var(--raised);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+}
+.scopes label:hover { border-color: var(--accent); }
+
+/* --- 6. Data --------------------------------------------------------------- */
+.tablewrap { overflow-x: auto; position: relative; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; padding: 0 8px 8px; white-space: nowrap;
+  font: 500 10.5px/1.4 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .14em; color: var(--muted);
+}
+td { padding: 11px 8px; border-top: 1px solid var(--hair); vertical-align: middle; }
+td.tight { width: 1%; white-space: nowrap; }
+tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.title { font-weight: 600; overflow-wrap: anywhere; }
+.target { color: var(--muted); font-size: 13px; word-break: break-all; }
+
+code, kbd {
+  font: 13px/1.4 var(--font-mono);
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 2px 6px;
+}
+.num { font: 500 13px/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Numbers whisper: a mono meta line, middot separated, never louder than the
+   sentence above it. */
+.meta {
+  font: 500 11.5px/1.5 var(--font-mono);
+  letter-spacing: .06em; color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline;
+}
+.meta .sep { opacity: .5; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 11px/1 var(--font-mono); letter-spacing: .08em;
+  padding: 5px 10px; border-radius: var(--r-pill);
+  background: var(--raised); border: 1px solid var(--line); color: var(--muted);
+}
+.pill.role-admin { border-color: var(--danger); color: var(--danger); }
+.pill.role-editor { border-color: var(--accent); color: var(--accent); }
+.pill.ok { border-color: var(--ok); color: var(--ok); }
+.pill.warn { border-color: var(--danger); color: var(--danger); }
+
+/* The dot is the workhorse icon of this system: a 7px circle that leads a row,
+   marks a state, or punctuates a label. A filled dot is a state that is on; a
+   hollow ring is a state that is running; a dim dot is off. */
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.dot.live { background: var(--ok); animation: gz-blink 3.2s var(--ease) infinite; }
+.dot.lit { background: var(--star); box-shadow: 0 0 10px color-mix(in srgb, var(--star) 55%, transparent); }
+.dot.ring { background: none; border: 1.5px solid currentColor; width: 8px; height: 8px; }
+.dot.off { background: var(--muted); opacity: .5; }
+
+.listrow {
+  display: flex; align-items: center; gap: 9px; padding: 10px 0;
+  border-top: 1px solid var(--hair); flex-wrap: wrap;
+}
+.listrow:first-of-type { border-top: 0; }
+.listrow .name { flex: 1; min-width: 130px; }
+
+.empty {
+  color: var(--muted); padding: 22px 14px; text-align: center; line-height: 1.6;
+}
+.hint { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+.hint.block { display: block; }
+
+.msg {
+  padding: 11px 13px; border-radius: var(--r-sm); margin-bottom: var(--s4);
+  font-size: 14px; display: none; word-break: break-word;
+  border: 1px solid transparent;
+}
+.msg.err { display: block; background: var(--raised); color: var(--danger); border-color: var(--danger); }
+.msg.ok { display: block; background: var(--raised); color: var(--accent); border-color: var(--accent); }
+.msg.warn { display: block; background: var(--raised); color: var(--warn); border-color: var(--warn); }
+.msg[hidden] { display: none; }
+
+.meter {
+  height: 6px; margin-top: 6px; overflow: hidden;
+  background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-pill);
+}
+.meter > span { display: block; height: 100%; background: var(--accent); }
+.meter.warn > span { background: var(--danger); }
+
+.star {
+  background: none; border: 0; line-height: 0; padding: 6px; cursor: pointer;
+  color: var(--muted); min-height: 36px; min-width: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.star:hover:not(:disabled) { color: var(--star); }
+.star.on { color: var(--star); }
+
+/* --- 7. The security language ---------------------------------------------
+   Five patterns. They are the difference between a link shortener and this
+   one, and each says something the copy would otherwise have to. */
+
+/* 7.1 SEALED — anything shown once. An API key, recovery codes, an invitation
+   link, a revealed target URL. Sealed is a *state*, not a security boundary:
+   the value is in the DOM, so treat it as visible to anyone with the screen.
+   What it buys is deliberate: nothing secret is on screen by accident, in a
+   screen-share, or over a shoulder, and revealing it is an act the person
+   chose. Where the server can withhold the value until asked, it should. */
+.sealed {
+  position: relative;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: var(--r); padding: 13px; margin-top: var(--s4);
+  background: var(--raised);
+  font: 13px/1.6 var(--font-mono); word-break: break-all; white-space: pre-wrap;
+}
+.sealed > .value { display: block; transition: filter .35s var(--ease); }
+.sealed[data-state="sealed"] > .value { filter: blur(7px); user-select: none; }
+.sealed[data-state="sealed"]::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--accent) 11%, transparent) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--accent) 11%, transparent) 0 1px, transparent 1px 8px);
+}
+.sealed[data-state="open"] > .value { filter: none; }
+.sealed .sealbar {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  margin-top: 10px; position: relative; z-index: 1;
+}
+.sealed .sealbar .grow { flex: 1; }
+
+/* 7.2 PROVENANCE — who did it, when, from where. On every consequential
+   action, every issued credential, every audit row. Mono, muted, middots, and
+   never a sentence: it is a receipt, not prose. */
+.prov {
+  font: 500 11px/1.5 var(--font-mono);
+  letter-spacing: .07em; color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center;
+  margin: var(--s3) 0 0;
+}
+.prov .sep { opacity: .45; }
+.prov .who { color: var(--ink); }
+.prov.tight { margin-top: 4px; }
+
+/* 7.3 ENGRAVED — the tamper-evident hairline, and it is a geodesic one. Two
+   hairline sets crossing at ±60° make the triangulated facets of a geodesic
+   dome; at 4-6% alpha the same mesh reads as the intaglio on a banknote. Both
+   readings are the point: the mark's geometry doing security's job.
+
+   It marks surfaces where the record itself matters — the audit log, an
+   irreversible control, a released code, the admin plane's band. Decoration
+   with a rule attached: if it is engraved, it is written down somewhere. */
+.engraved {
+  position: relative;
+  background-image:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--ink) 5%, transparent) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--ink) 5%, transparent) 0 1px, transparent 1px 8px);
+  background-clip: padding-box;
+}
+.engraved-top { position: relative; }
+.engraved-top::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--accent) 45%, transparent) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--accent) 45%, transparent) 0 1px, transparent 1px 7px);
+}
+
+.audit {
+  font: 12px/1.65 var(--font-mono);
+  max-height: 320px; overflow: auto;
+  border: 1px solid var(--line); border-radius: var(--r); padding: var(--s3);
+  background-image:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--ink) 4%, transparent) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--ink) 4%, transparent) 0 1px, transparent 1px 9px);
+}
+.audit div {
+  padding: 4px 2px; border-top: 1px solid var(--hair);
+  white-space: pre-wrap; word-break: break-word;
+}
+.audit div:first-child { border-top: 0; }
+.audit .t { color: var(--muted); }
+.audit .actor { color: var(--accent); }
+
+/* 7.4 TRUST — state, not marketing. A trust chip says what is true right now
+   and nothing more; if a thing is off, the chip says so in the same voice. */
+.trustrow { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.trust {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--raised);
+  font: 500 10.5px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
+}
+.trust.on { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); color: var(--ok); }
+.trust.attn { border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); color: var(--warn); }
+.trust.off { opacity: .75; }
+
+/* 7.5 SCOPE — what this account can reach, stated on the page it acts on and
+   never further away than the header. The admin plane's .planeband is the same
+   component, turned up. */
+.scopebar {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  padding: 9px 13px; margin-bottom: var(--s5);
+  border: 1px solid var(--hair); border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--accent) 4%, var(--panel));
+  font: 500 11px/1.4 var(--font-mono); letter-spacing: .08em; color: var(--muted);
+}
+.scopebar .lead { color: var(--ink); text-transform: uppercase; letter-spacing: .14em; }
+.scopebar .sep { opacity: .45; }
+.scopebar .end { margin-left: auto; }
+
+/* The standing statement of what is never recorded. It is a footer because it
+   should be findable without being sold; it is mono because it is a fact; and
+   it leads with a hop rather than a padlock, because the two nodes are the
+   claim: this service knows the link and that it was followed, and knows
+   nothing about who followed it. */
+.nolog {
+  margin-top: var(--s7); padding-top: var(--s5);
+  border-top: 1px solid var(--hair);
+  font: 500 11.5px/1.7 var(--font-mono); letter-spacing: .05em;
+  color: var(--muted); text-align: center;
+}
+.nolog strong { color: var(--ink); font-weight: 500; }
+.nolog .never { display: inline-flex; align-items: center; gap: 7px; }
+.nolog .never .hop { color: var(--muted); }
+.nolog code { font-size: 11.5px; }
+
+/* 7.6 THE GEODESIC — the mark is not a logo bolted to a stylesheet, it is the
+   product's one idea: a geodesic is the shortest path between two points on a
+   curved surface, which is exactly what a short link is. Everything below is
+   downstream of that sentence.
+
+   THE 60° LAW. Every diagonal this system draws is 60° or 120° — the angles
+   of the icosahedral facet — and never 45°. Hatches, meshes, sheens, arrow
+   heads, corner cuts: 60°. It is one rule, it is checkable in a diff, and it
+   is why the engraved mesh (7.3) reads as the sphere's own surface unrolled
+   rather than as generic diagonal stripes.
+
+   Where 60° comes from: the faces are equilateral triangles, so the three
+   crossing directions of the flattened mesh sit at 0°, +60° and −60°. The solid
+   the system draws is the class I geodesic polyhedron at frequency 2 — in
+   Goldberg–Coxeter notation {3,5+}(2,0) — whose triangulation number is
+   T = b² + bc + c² = 4, giving V = 10T + 2 = 42 vertices, E = 30T = 120 edges
+   and F = 20T = 80 faces. The notation is allowed to surface in exactly two
+   places, both of them opt-in and neither of them load-bearing: the appearance
+   popover's Field label, and the geodesic section of the system document.
+   Anywhere else it is trivia sitting on somebody's dead link.
+
+   THE TWO NODES. A geodesic has exactly two endpoints, and so does this
+   service's knowledge of a click: the link, and the fact that it was followed.
+   Nothing about the traveller is recorded — no IP, no user agent, no referrer.
+   The mark is therefore also the privacy statement, which is why .nolog is
+   drawn with a hop rather than a padlock.
+
+   THE THREE CARRIERS, and nothing else may carry it:
+     .mark   the sphere, its arc lit and drawn on first paint
+     .hop    two nodes and the arc between them, wherever a link is named
+     the engraved mesh (7.3), the sphere's facets flattened out
+
+   HOP STATES. Filled node → solid arc → filled node is a link that arrives.
+   Every way a link stops arriving has its own arc, so the glyph carries the
+   state before the words do — and the notice family (section 8) is the same
+   five glyphs at 58px:
+
+     .hop            live        both nodes filled, arc solid
+     .hop.pending    scheduled   far node hollow, arc dotted
+     .hop.spent      expired · used up   arc stops short of a hollow node
+     .hop.dead       retired     both nodes hollow, only a chord remembers it
+     .hop.barred     disabled    solid arc, crossed
+
+   Never color-only: each state changes the drawing, so it survives
+   monochrome, high contrast, and a printed page. */
+.hop { display: inline-flex; align-items: center; line-height: 0; color: var(--accent); }
+.hop svg { overflow: visible; }
+.hop.pending { color: var(--muted); }
+.hop.spent { color: var(--warn); }
+.hop.dead { color: var(--muted); }
+.hop.barred { color: var(--danger); }
+
+/* The hover gesture: a dash travels the arc once. Driven by a class that
+   hop-travel.js adds, never by `:hover` — see that file for why. In short,
+   `:hover { animation }` restarts the animation when the pointer re-enters,
+   discards it when the pointer leaves, and fires once per row edge when the
+   pointer travels along a table. The class is added once, removed by the
+   animation itself, and refused if it fired in the last 1.6s, so the gesture
+   always completes and can never be retriggered into looking broken.
+
+   With the script absent the arc is simply solid, which is the right
+   degradation: a hop that never animates is correct, a hop that animates badly
+   is not. */
+.hop.travelling .geodesic {
+  animation: gz-travel 1.25s var(--ease);
+}
+
+/* The ambient hop. The same gesture, unprompted and rare: the muted glyph in
+   the `.nolog` footer takes one smooth travel every twenty-two seconds and is
+   a solid arc the rest of the time. It is not the hover animation slowed down
+   — the hover version is a response to you, so it is quick and it loops with
+   the pointer; this one is the page breathing once while you read, so it
+   travels exactly once and then rests.
+
+   Time-gating is in the keyframe rather than in script: the travel occupies
+   the first eleven percent of a long cycle and the remaining eighty-nine is
+   the resting state held still. No timer, no JS, nothing to tear down, and
+   the global reduced-motion rule silences it like everything else.
+
+   Only on `.hop.ambient`, and the only place it is used is the footer glyph.
+   A page with two of these would have a heartbeat. */
+.hop.ambient .geodesic {
+  animation: gz-ambient 22s var(--ease) 3s infinite;
+}
+@keyframes gz-ambient {
+  0% { stroke-dasharray: 3 23; stroke-dashoffset: 26; }
+  6% { stroke-dasharray: 3 23; stroke-dashoffset: 3; }
+  11% { stroke-dasharray: 26 0; stroke-dashoffset: 0; }
+  100% { stroke-dasharray: 26 0; stroke-dashoffset: 0; }
+}
+
+/* A link's identity line: the hop, the code in mono, the target underneath. */
+.hopline { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
+.hopline .code {
+  font: 500 12.5px/1 var(--font-mono); letter-spacing: .02em;
+  padding: 4px 8px; border-radius: var(--r-sm);
+  background: var(--raised); border: 1px solid var(--line); white-space: nowrap;
+}
+
+/* The facet watermark. One panel per page may carry the dome's structure at
+   the very edge of visibility — the Dome plane uses it on the audit log and
+   the scope panel, the Arc plane does not use it at all. Never behind body
+   copy at more than 3% alpha, and gone entirely in high contrast. */
+.facets { position: relative; }
+.facets::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--ink) 3%, transparent) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--ink) 3%, transparent) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(0deg,
+      color-mix(in srgb, var(--ink) 3%, transparent) 0 1px, transparent 1px 19px);
+}
+[data-theme="hc-dark"] .facets::after,
+[data-theme="hc-light"] .facets::after { display: none; }
+
+/* --- 8. Pages -------------------------------------------------------------- */
+.login { max-width: 400px; margin: 8vh auto; }
+.login h1 { font-size: 24px; margin-bottom: 4px; }
+.login p.sub {
+  color: var(--muted); font-size: 13.5px; margin: 0 0 20px; font-family: var(--font-ui);
+}
+.or {
+  display: flex; align-items: center; gap: 10px; margin: var(--s5) 0;
+  color: var(--muted); font: 500 10.5px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .18em;
+}
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+.foot { color: var(--muted); font-size: 12px; margin-top: 26px; text-align: center; }
+.step[hidden] { display: none; }
+
+.qr {
+  background: #fff; padding: 12px; border-radius: var(--r); display: inline-block;
+  line-height: 0; border: 1px solid var(--line);
+}
+.codes {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--s3); margin: var(--s4) 0;
+}
+.codes span {
+  font: 14px/1.5 var(--font-mono); text-align: center; user-select: all;
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 9px;
+}
+.ack { display: flex; align-items: flex-start; gap: 10px; margin-top: var(--s5); font-size: 14px; }
+.ack input { width: 20px; }
+
+/* Notices. Somebody who is not a user of this service, sent a link by somebody
+   they know, arriving at a dead end that is not their fault. It is the most
+   public surface here, the only one set entirely in the serif, and the one
+   place the hop is drawn large: the glyph says what happened before the
+   sentence does, and the five states are the same five glyphs at 58px. */
+.notice { max-width: 480px; margin: 13vh auto; padding: 0 24px; text-align: center; }
+.notice .mark { color: var(--accent); display: flex; justify-content: center; margin-bottom: 18px; }
+.notice .hop { justify-content: center; display: flex; margin-bottom: 20px; }
+.notice .hop svg { width: 132px; height: 66px; }
+.notice h1 {
+  display: block; font: 600 27px/1.2 var(--font-serif);
+  letter-spacing: -.015em; margin: 0 0 12px;
+}
+.notice .lead { color: var(--ink); margin: 0 0 14px; font-size: 15.5px; line-height: 1.65; }
+.notice .u { color: var(--muted); font-size: 13.5px; line-height: 1.65; margin: 0; }
+.notice .home { margin: 24px 0 0; }
+.notice .home a {
+  font-weight: 600; text-decoration: none;
+  border-bottom: 1px solid currentColor; padding-bottom: 2px;
+}
+.notice .home a:hover { border-bottom-width: 2px; }
+.notice .code {
+  margin-top: 34px; font: 500 10.5px/1.6 var(--font-mono);
+  letter-spacing: .22em; color: var(--muted); opacity: .75;
+}
+.notice .ghost {
+  color: var(--accent); display: flex; justify-content: center; margin-bottom: 16px;
+  animation: gz-drift 4.5s ease-in-out infinite;
+}
+
+/* Public collection and embed. No theme control, no account, nothing to
+   remember about whoever opened it. */
+.coll { max-width: 720px; margin: 0 auto; padding: 22px; }
+.coll.embedded { padding: 12px; }
+.coll h1 { font-size: 20px; margin: 0 0 3px; }
+.coll .by {
+  color: var(--muted); margin: 0 0 var(--s5);
+  font: 500 11px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
+}
+.coll ul { list-style: none; margin: 0; padding: 0; }
+.coll li { border-top: 1px solid var(--hair); padding: 11px 2px; }
+.coll li:first-child { border-top: 0; }
+.coll a {
+  text-decoration: none; font-weight: 600; display: block; min-height: 24px;
+  overflow-wrap: anywhere; color: var(--ink);
+}
+.coll a:hover { color: var(--accent); text-decoration: underline; }
+.coll .u {
+  display: block; margin-top: 3px; color: var(--muted);
+  font: 11.5px/1.5 var(--font-mono); word-break: break-all;
+}
+.coll .fav { color: var(--star); margin-right: 5px; }
+
+/* The appearance control. */
+.themebtn { min-width: 40px; padding: 9px 11px; display: inline-flex; align-items: center; justify-content: center; }
+.themepop {
+  position: absolute; right: 20px; margin-top: 6px; z-index: 5; min-width: 236px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: var(--s5); box-shadow: var(--lift-lg);
+}
+.themepop[hidden] { display: none; }
+.themepop fieldset { border: 0; padding: 0; margin: 0 0 var(--s4); }
+.themepop legend {
+  padding: 0; margin-bottom: 8px;
+  font: 500 10.5px/1 var(--font-mono); text-transform: uppercase;
+  letter-spacing: .16em; color: var(--muted);
+}
+.themepop label {
+  display: flex; align-items: center; gap: 9px; margin: 0; padding: 7px 6px;
+  min-height: 38px; cursor: pointer; border-radius: var(--r-sm);
+  font: 400 14px/1 var(--font-ui); text-transform: none; letter-spacing: 0;
+  color: var(--ink);
+}
+.themepop label:hover { background: var(--raised); }
+.themepop input[type=radio] { width: 18px; height: 18px; min-height: 18px; accent-color: var(--accent); }
+
+/* --- 9. The Keep ----------------------------------------------------------
+   The admin plane is a different room in the same building. Stamped on <body>
+   by the server — the admin page is only ever served on ADMIN_HOST, so which
+   plane you are on is decided before any markup exists and no client-side code
+   ever infers it.
+
+   What changes: the ground goes cold, the accent goes iris, corners tighten,
+   headings take the serif, the light source moves and dims, and the engraved
+   hairline appears on the surfaces that keep records. What does not change:
+   every state color (ok, warn, danger, star) means the same thing in both
+   planes, which is why they are not re-pointed here. */
+[data-plane="admin"] {
+  --bg: var(--admin-bg);
+  --panel: var(--admin-panel);
+  --raised: var(--admin-raised);
+  --ink: var(--admin-ink);
+  --muted: var(--admin-muted);
+  --line: var(--admin-line);
+  --accent: var(--admin-accent);
+  --accent-ink: var(--admin-accent-ink);
+  --grad-a: var(--admin-grad-a);
+  --grad-b: var(--admin-grad-b);
+  --lamp: var(--admin-lamp);
+  --r-sm: 4px; --r: 7px; --r-lg: 9px;
+  --measure: 1000px;
+}
+[data-plane="admin"]::before,
+body[data-plane="admin"]::before {
+  background:
+    radial-gradient(46rem 30rem at 8% -6%, var(--lamp), transparent 70%);
+  animation: none;
+}
+[data-plane="admin"] .wrap { padding: 26px 24px 96px; }
+
+/* Comfier than the link dashboard on purpose: a page you read and think on
+   rather than paste into. More air, a longer measure, squarer edges. */
+[data-plane="admin"] .panel { padding: 20px 22px 22px; margin-bottom: 18px; }
+
+/* Admin headings are set in the serif with a mono kicker above them — the one
+   structural difference a screenshot shows instantly. */
+[data-plane="admin"] .panel > h2,
+[data-plane="admin"] details.panel > summary {
+  font: 600 16px/1.3 var(--font-serif);
+  text-transform: none; letter-spacing: -.01em; color: var(--ink);
+  margin-bottom: var(--s5);
+}
+[data-plane="admin"] .panel > h2 .right,
+[data-plane="admin"] details.panel > summary .note {
+  font: 500 11px/1 var(--font-mono); letter-spacing: .1em; color: var(--muted);
+}
+[data-plane="admin"] details.panel[open] > summary { margin-bottom: 18px; }
+[data-plane="admin"] .listrow { padding: 12px 0; }
+[data-plane="admin"] td { padding: 13px 8px; font-variant-numeric: tabular-nums; }
+[data-plane="admin"] .hint { font-size: 13px; line-height: 1.65; }
+[data-plane="admin"] h1 { font-size: 21px; }
+
+/* A standing band, so "which plane am I on" is answered before you read a word
+   and stays answered while you scroll. Engraved, because everything done here
+   is written to the log. */
+.planeband {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 15px; margin-bottom: 18px;
+  border: 1px solid var(--accent); border-radius: var(--r);
+  background:
+    repeating-linear-gradient(60deg,
+      color-mix(in srgb, var(--accent) 9%, transparent) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-60deg,
+      color-mix(in srgb, var(--accent) 9%, transparent) 0 1px, transparent 1px 9px),
+    var(--raised);
+}
+.planeband .tag {
+  padding: 4px 11px; border-radius: var(--r-pill);
+  background: var(--accent); color: var(--accent-ink);
+  font: 700 10.5px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .14em;
+}
+.planeband .what { color: var(--ink); font-size: 13.5px; }
+.planeband .where {
+  margin-left: auto; color: var(--muted);
+  font: 500 11px/1.4 var(--font-mono); letter-spacing: .05em;
+}
+@media (max-width: 560px) { .planeband .where { margin-left: 0; width: 100%; } }
+
+/* An invitation is handed over by a human, so the thing to optimize is the
+   paste. The message is editable before sending — it is a draft, not a form. */
+.invitemsg {
+  width: 100%; min-height: 190px; resize: vertical; padding: 13px;
+  font: 13px/1.65 var(--font-mono);
+  background: var(--raised); border: 1px solid var(--accent); border-radius: var(--r);
+}
+.invitebar { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+.invitebar .grow { flex: 1; }
+
+/* --- 10. Motion -----------------------------------------------------------
+   Five signatures, all slow, none decorative-only: the bloom breathes so the
+   page reads as lit rather than painted; the dot blinks where something is
+   live; content rises once on load; the arc travels when you point at a link;
+   the mark's geodesic draws itself the first time you see it. All of it stops
+   for anyone who asked for less motion.
+
+   HOW A THING IS ALLOWED TO MOVE. One rule, and it is the difference between
+   motion that feels responsive and motion that looks broken:
+
+     A state that can be toggled uses a TRANSITION.
+     A gesture that happens once uses an ANIMATION that ends on the resting
+     state, and is triggered by a class rather than by `:hover`.
+
+   Transitions interpolate from wherever the property currently is, so they are
+   interruptible by construction: reveal, hide, reveal again as fast as you like
+   and every frame is valid. Animations restart from frame zero and are removed
+   outright when their selector stops matching, so on a toggleable state they
+   stutter and on `:hover` they machine-gun.
+
+   Both halves of that rule were learned here. The sealed value's reveal was an
+   animation and flickered when toggled quickly; it is now the `filter`
+   transition alone, which was already doing the work. The hop's travel was on
+   `:hover` and restarted on re-entry, vanished on leave, and fired once per row
+   edge when the pointer ran down a table; it is now a class with a cooldown
+   (hop-travel.js) and a keyframe that lands exactly on the solid arc.
+
+   What is left as a plain infinite animation is only what nothing can trigger:
+   the bloom, the blink, the notice ghost, the ambient footer glyph. Nothing a
+   pointer can reach is on a loop. */
+@keyframes gz-bloom { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
+@keyframes gz-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes gz-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes gz-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes gz-trace { from { stroke-dashoffset: 26; } to { stroke-dashoffset: 0; } }
+/* A dash traveling the arc: the hop being taken, once, on hover.
+
+   The end state has to *be* the resting state, or the last frame pops. The
+   first version ran a 3-on/23-off dash from one end to the other and stopped
+   there — at which point the dash pattern was dropped and the full solid arc
+   snapped back in a single frame. It read as a stutter right where the easing
+   was trying to settle.
+
+   So the dash grows into the solid line instead of vanishing from it: `3 23`
+   interpolates to `26 0` over the last third, which is the path's own length
+   and therefore exactly what the arc looks like at rest. There is nothing to
+   snap back to — which is also what makes an interrupted gesture safe, since
+   every frame after the halfway point is already close to solid. */
+@keyframes gz-travel {
+  0% { stroke-dasharray: 3 23; stroke-dashoffset: 26; }
+  55% { stroke-dasharray: 3 23; stroke-dashoffset: 3; }
+  100% { stroke-dasharray: 26 0; stroke-dashoffset: 0; }
+}
+
+main { animation: gz-rise .5s var(--ease) both; }
+.mark .geodesic { stroke-dasharray: 26; animation: gz-trace 1.1s var(--ease) .15s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .mark .geodesic { stroke-dasharray: none; }
+  /* The travel keyframe ends solid, so collapsing it to nothing leaves the arc
+     correct rather than mid-dash. The script also refuses to add the class at
+     all under reduced motion, so this is only the belt. */
+  .hop.travelling .geodesic, .hop.ambient .geodesic { animation: none; }
+}
+
+/* --- 11. The field --------------------------------------------------------
+   The moving edge of the dome, in the gutters only. Every stroke is drawn by
+   geodesic-field.js; this is only where the canvas sits.
+
+   z-index -2 puts it beneath the backdrop lamp (-1) and therefore beneath
+   everything, and the element is inert to the pointer, to the tab order and to
+   a screen reader. It carries `noprint` in the markup, so the utility that
+   cannot be outranked keeps it off paper without this section touching the
+   print block.
+
+   Deliberately no opacity transition here. The script ramps its own strength
+   continuously against the gutter width, so a CSS fade would fight the reveal
+   while a window edge is being dragged — the one moment the whole thing is
+   for. The only job left for CSS is to make sure the element does not exist
+   where it must never appear.
+
+   It is opt-in: a third value in the Backdrop fieldset next to Solid and
+   Gradient, on the same stored preference. Nobody is given it by surprise. */
+.fieldcanvas {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  display: block;
+}
+
+/* High contrast withdraws decoration outright rather than turning it down, so
+   the field is not dimmed here — it is gone. The script checks the theme too;
+   this is the belt to its braces.
+
+   The width floor sits well below the script's own ramp (which starts once the
+   gutters clear 130px, around 1320px wide) so crossing it can never pop: by
+   the time this rule stops applying the script is still drawing nothing, and
+   the ramp does the rest. Below it a narrow viewport pays nothing at all. */
+[data-theme="hc-dark"] .fieldcanvas,
+[data-theme="hc-light"] .fieldcanvas { display: none; }
+@media (max-width: 1240px) { .fieldcanvas { display: none; } }
+
+/* --- Utilities kept from the current sheet -------------------------------
+   Every one-off tweak lives here because the CSP blocks style attributes
+   outright: a nonce cannot be attached to one, and 'unsafe-inline' alongside a
+   nonce is ignored by the spec. */
+.m0 { margin: 0; } .mt0 { margin-top: 0; } .mt8 { margin-top: 8px; }
+.mt10 { margin-top: 10px; } .mt12 { margin-top: 12px; } .mt14 { margin-top: 14px; }
+.mt16 { margin-top: 16px; } .mt20 { margin-top: 20px; }
+.mb10 { margin-bottom: 10px; } .mb12 { margin-bottom: 12px; }
+.muted { color: var(--muted); }
+.grow { flex: 1; }
+.block { display: block; }
+.spaced { margin-top: 14px; }
+.field { display: flex; align-items: center; min-height: 40px; }
+@media print { .noprint { display: none; } }

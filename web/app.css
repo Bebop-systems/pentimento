@@ -1,0 +1,259 @@
+/* Metadata Editor — additions on top of geodzk.css.
+ *
+ * Nothing here redefines a colour. Every value comes from the design
+ * system's tokens so all five themes keep working.
+ */
+
+[hidden] { display: none !important; }
+
+/* ---------- drop zone ----------------------------------------------------
+   A label rather than a button: clicking a label natively opens its file
+   input, with no JavaScript in the path. The earlier version called
+   input.click() from a handler and silently did nothing in some browsers. */
+
+.dropzone {
+  display: block;
+  cursor: pointer;
+  text-align: center;
+  padding: var(--s8) var(--s5);
+  /* The system styles every `label` as an uppercase mono field caption.
+     This one is a drop target containing prose, so that has to be undone
+     rather than inherited. */
+  font: 15px/1.55 var(--font-ui);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.dropzone:hover,
+.dropzone:focus-within { border-color: var(--accent); }
+.dropzone.over {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.dropzone-inner { display: grid; gap: var(--s2); justify-items: center; }
+.dropzone-icon { width: 30px; height: 30px; color: var(--muted); }
+.dropzone-title {
+  font: 600 17px/1.3 var(--font-serif);
+  color: var(--ink);
+  margin-top: var(--s2);
+}
+.dropzone .hint { margin: 0; }
+
+/* ---------- columns ---------------------------------------------------- */
+
+.cols { display: grid; gap: var(--s4); grid-template-columns: 1fr; }
+@media (min-width: 940px) {
+  .cols { grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr); }
+}
+.col-side { align-self: start; }
+
+/* ---------- risk cards -------------------------------------------------
+   Replaces a single long scrolling list. Each card is a filter; the one
+   selected drives the detail table below. */
+
+.cards {
+  display: grid; gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+
+.card {
+  text-align: left; display: grid; gap: 3px; align-content: start;
+  padding: var(--s4); min-height: 0;
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+}
+.card:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.card[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--tint);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.card .card-top {
+  display: flex; align-items: baseline; gap: var(--s2); width: 100%;
+}
+.card .card-count {
+  font: 600 22px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.card .card-name {
+  font: 500 10.5px/1.3 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .13em;
+  color: var(--muted);
+}
+.card .card-why {
+  font: 400 12px/1.45 var(--font-ui);
+  color: var(--muted); white-space: normal;
+}
+.card.risk .card-count { color: var(--danger); }
+.card.gone { opacity: .5; }
+.card.gone .card-count { color: var(--ok); }
+
+/* ---------- tag rows ---------------------------------------------------- */
+
+.tagrow {
+  display: grid; gap: var(--s2) var(--s4);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--hair);
+}
+.tagrow:first-child { border-top: 0; }
+.tagrow.is-removed { opacity: .5; }
+.tagrow.is-removed .tagvalue { text-decoration: line-through; }
+.tagrow.is-edited { background: var(--tint); }
+
+.tagname {
+  font: 600 14px/1.3 var(--font-ui);
+  overflow-wrap: anywhere;
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+}
+.tagname .grp {
+  font: 500 10px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); font-weight: 500;
+}
+.tagvalue {
+  font: 13px/1.5 var(--font-mono);
+  color: var(--ink); overflow-wrap: anywhere; margin-top: 2px;
+}
+.tagvalue input { font-family: var(--font-mono); font-size: 13px; }
+.tagwhat {
+  grid-column: 1 / -1;
+  font: 400 12.5px/1.6 var(--font-ui);
+  color: var(--muted); margin: 0; max-width: 62ch;
+}
+.tagwhat .reveals { color: var(--ink); opacity: .82; }
+.tagwhat .reveals::before {
+  content: "Reveals: ";
+  font: 500 10px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted);
+}
+.tagactions { display: flex; gap: var(--s2); align-items: flex-start; }
+.tagactions button { min-height: 32px; padding: 5px 10px; font-size: 12.5px; }
+
+/* A value held back until asked for, using the system's sealed pattern at
+   row scale. Your own coordinates should not be on screen by accident. */
+.veil {
+  filter: blur(6px); user-select: none; cursor: pointer;
+  transition: filter .35s var(--ease);
+}
+.veil:hover { filter: blur(4px); }
+.veil.open { filter: none; user-select: text; cursor: text; }
+
+/* ---------- gates ------------------------------------------------------- */
+
+.gatehead {
+  display: flex; align-items: baseline; gap: var(--s4);
+  flex-wrap: wrap; margin-bottom: var(--s4);
+}
+.gatehead .verdict {
+  font: 600 17px/1.2 var(--font-serif);
+  color: var(--ok);
+}
+.gatehead .verdict.bad { color: var(--danger); }
+.gatelist { display: grid; gap: var(--s3); }
+/* The system's .lit dot is the star colour. A gate is pass or fail, so it
+   borrows the ok/danger pair the trust chips already use. */
+.gate .dot { margin-top: 5px; }
+.gate .dot.pass { background: var(--ok); }
+.gate .dot.fail {
+  background: none; border: 1.5px solid var(--danger);
+  width: 8px; height: 8px;
+}
+.gate { display: grid; grid-template-columns: auto 1fr; gap: var(--s3); }
+.gate .gate-body { display: grid; gap: 1px; }
+.gate .gate-name {
+  font: 500 11px/1.3 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .13em; color: var(--ink);
+}
+.gate .gate-meaning { font-size: 12.5px; color: var(--muted); }
+.gate .gate-detail {
+  font: 11.5px/1.5 var(--font-mono); color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.savedbar {
+  display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap;
+  margin-top: var(--s5); padding-top: var(--s4);
+  border-top: 1px solid var(--hair);
+}
+.savedbar .path {
+  flex: 1 1 260px;
+  font: 12px/1.5 var(--font-mono);
+  color: var(--ink); word-break: break-all;
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 8px 10px;
+}
+.savedbar .lead {
+  font: 500 10.5px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .13em; color: var(--muted);
+  flex: 1 1 100%; margin-bottom: -4px;
+}
+
+/* ---------- findings and diff ------------------------------------------ */
+
+.finding {
+  display: grid; gap: 3px; padding: var(--s4) 0;
+  border-top: 1px solid var(--hair);
+}
+.finding:first-child { border-top: 0; }
+.finding .rulename {
+  font: 500 10px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .13em;
+}
+.finding.warning .rulename { color: var(--danger); }
+.finding.note .rulename { color: var(--warn); }
+.finding .msgtext { font-size: 13px; color: var(--ink); }
+
+.diffrow {
+  display: grid; gap: 2px; padding: var(--s3) 0;
+  border-top: 1px solid var(--hair);
+}
+.diffrow:first-child { border-top: 0; }
+.diffrow .k {
+  font: 500 12px/1.4 var(--font-ui); overflow-wrap: anywhere;
+  display: flex; gap: var(--s2); align-items: baseline;
+}
+.diffrow .kind {
+  font: 500 9.5px/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: .12em; flex: none;
+}
+.diffrow.removed .kind { color: var(--danger); }
+.diffrow.changed .kind { color: var(--accent); }
+.diffrow.added .kind { color: var(--ok); }
+.diffrow .v {
+  font: 11.5px/1.5 var(--font-mono); color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- toast ------------------------------------------------------- */
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px;
+  z-index: 60; max-width: 92vw;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--accent); border-radius: var(--r);
+  box-shadow: var(--lift-lg);
+  padding: 11px 16px;
+  font: 500 13px/1.4 var(--font-ui);
+}
+.toast.bad { border-color: var(--danger); color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .veil { transition: none; }
+}
+
+/* An anchor that has to read as a button. */
+.button-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 9px 14px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--raised); color: var(--ink);
+  font: 500 14px/1.2 var(--font-ui); text-decoration: none;
+}
+.button-link:hover { border-color: var(--accent); color: var(--accent); }

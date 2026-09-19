@@ -1,93 +1,136 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-bg="gradient">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Metadata Editor</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6f4e'/%3E%3Cpath d='M9 20.5 L23 11.5 M9 11.5 L23 20.5' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23110F0D'/%3E%3Cpath d='M16 5 L26 21 L6 21 Z M16 5 L16 21 M6 21 L26 21' fill='none' stroke='%237DB9F2' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/geodzk.css">
+<link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<header class="bar">
-  <div class="brand">
-    <span class="dot"></span>
-    <h1>Metadata Editor</h1>
+<div class="wrap">
+
+  <header>
+    <h1>
+      <span class="mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 3 L20.5 18 L3.5 18 Z" stroke="currentColor" stroke-width="1.5"
+                stroke-linejoin="round"/>
+          <path d="M12 3 L12 18 M3.5 18 L20.5 18 M7.7 10.5 L16.3 10.5"
+                stroke="currentColor" stroke-width="1" opacity=".55"/>
+        </svg>
+      </span>
+      Metadata Editor
+      <span class="sub">exif · xmp · gps</span>
+    </h1>
+    <span class="spacer"></span>
+    <button type="button" id="theme" class="link" title="Switch theme">
+      <span id="theme-label">Dark</span>
+    </button>
+  </header>
+
+  <div class="scopebar">
+    <span class="lead">Local only</span>
+    <span class="sep">·</span>
+    <span>no network, no account, nothing uploaded</span>
+    <span class="end" id="file-label">no file loaded</span>
   </div>
-  <div class="bar-meta">
-    <span id="file-label" class="muted">No file loaded</span>
-    <span class="pill pill-local" title="No network requests are made. Files stay in a temp folder that is deleted when you close the server.">local only</span>
-  </div>
-</header>
 
-<main>
+  <div class="msg err" id="error" hidden></div>
 
-  <section id="drop" class="drop">
-    <input type="file" id="file-input" hidden
-           accept="image/*,video/*,.heic,.heif,.dng,.cr2,.nef,.arw">
-    <div class="drop-inner">
-      <svg viewBox="0 0 24 24" class="drop-icon" aria-hidden="true">
-        <path d="M12 16V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor"
-              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none"
-              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      <p class="drop-title">Drop a photo or video here</p>
-      <p class="muted">or <button type="button" id="browse" class="linkbtn">choose a file</button></p>
-      <p class="muted small">Your original is never modified. You get a new file.</p>
-    </div>
-  </section>
+  <main id="main">
 
-  <section id="workspace" hidden>
+    <!-- ---------- drop zone ---------- -->
+    <label class="panel dropzone" id="drop" for="file-input">
+      <input type="file" id="file-input" class="sr"
+             accept="image/*,video/*,.heic,.heif,.dng,.cr2,.nef,.arw">
+      <span class="dropzone-inner">
+        <svg viewBox="0 0 24 24" class="dropzone-icon" aria-hidden="true">
+          <path d="M12 16V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none"
+                stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="dropzone-title">Drop a photo or video here</span>
+        <span class="hint block">or click anywhere in this panel to choose one</span>
+        <span class="hint block">Your original is never modified. You get a new file.</span>
+      </span>
+    </label>
 
-    <div class="controls">
-      <div class="control">
-        <label for="preset">Preset</label>
-        <select id="preset"></select>
-        <p id="preset-help" class="muted small"></p>
-      </div>
-      <div class="control" id="profile-control" hidden>
-        <label for="profile">Camera identity</label>
-        <select id="profile"></select>
-        <p class="muted small">Every field is written to agree with the others.</p>
-      </div>
-      <div class="control">
-        <label for="shift">Shift dates (days)</label>
-        <input type="number" id="shift" value="0" step="1">
-        <p class="muted small">All timestamps move together, so their order survives.</p>
-      </div>
-      <div class="control control-action">
-        <button id="apply" class="primary">Write clean copy</button>
-        <p class="muted small">Verified before you can download it.</p>
-      </div>
-    </div>
+    <!-- ---------- workspace ---------- -->
+    <div id="workspace" hidden>
 
-    <div id="gates" class="gates" hidden></div>
-
-    <div class="columns">
-      <div class="col-main">
-        <div class="col-head">
-          <h2>Metadata</h2>
-          <div class="legend" id="legend"></div>
+      <section class="panel">
+        <h2>What to change <span class="right" id="plan-note"></span></h2>
+        <div class="row">
+          <div>
+            <label for="preset">Preset</label>
+            <select id="preset"></select>
+          </div>
+          <div id="profile-control" hidden>
+            <label for="profile">Camera identity</label>
+            <select id="profile"></select>
+          </div>
+          <div class="narrow">
+            <label for="shift">Shift dates (days)</label>
+            <input type="number" id="shift" value="0" step="1">
+          </div>
+          <div class="go">
+            <label for="apply">&nbsp;</label>
+            <button id="apply" class="primary">Write verified copy</button>
+          </div>
         </div>
-        <div id="tags" class="tags"></div>
+        <p class="hint" id="preset-help"></p>
+      </section>
+
+      <section class="panel engraved-top" id="gates" hidden></section>
+
+      <div class="cols">
+        <div class="col-main">
+
+          <section class="panel">
+            <h2>What this file reveals <span class="right" id="tag-total"></span></h2>
+            <div class="cards" id="cards"></div>
+          </section>
+
+          <section class="panel" id="detail-panel">
+            <h2>
+              <span id="detail-title">Details</span>
+              <span class="right">
+                <button type="button" class="link" id="reveal-all">Reveal values</button>
+              </span>
+            </h2>
+            <p class="hint mt0" id="detail-summary"></p>
+            <div id="tags"></div>
+          </section>
+
+        </div>
+
+        <aside class="col-side">
+          <section class="panel">
+            <h2>Consistency</h2>
+            <p class="hint mt0">Contradictions a careful inspector would notice.</p>
+            <div id="findings"></div>
+          </section>
+
+          <section class="panel">
+            <h2>Pending changes <span class="right" id="diff-count"></span></h2>
+            <div id="diff"></div>
+          </section>
+        </aside>
       </div>
-
-      <aside class="col-side">
-        <section class="panel">
-          <h2>Consistency</h2>
-          <p class="muted small">Contradictions a careful inspector would notice.</p>
-          <div id="findings"></div>
-        </section>
-
-        <section class="panel">
-          <h2>Pending changes</h2>
-          <div id="diff"></div>
-        </section>
-      </aside>
     </div>
-  </section>
-</main>
+  </main>
+
+  <p class="nolog">
+    <span class="never">Nothing leaves this machine.</span><br>
+    No upload, no telemetry, no account. Working files live in a temporary
+    folder that is deleted when you stop the server.
+  </p>
+</div>
 
 <div id="toast" class="toast" hidden></div>
 
