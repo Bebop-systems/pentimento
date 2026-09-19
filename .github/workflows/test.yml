@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: exiftool-${{ runner.os }}-13.59
+          key: exiftool-${{ runner.os }}-13.59-pruned
 
       - name: Fetch ExifTool
         run: python scripts/fetch_exiftool.py

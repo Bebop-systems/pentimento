@@ -32,6 +32,23 @@ datas = [
     (str(ROOT / "vendor"), "vendor"),
 ]
 
+
+def _drop_exiftool_test_suite(entries):
+    """Keep ExifTool's own test fixtures out of the bundle.
+
+    fetch_exiftool prunes these, but a stale vendor directory must not be
+    able to fail an entire build. t/images holds deliberately malformed
+    files, including a Mach-O with no load commands; PyInstaller sees the
+    magic number, tries to process it as a real binary and dies.
+    """
+    keep = []
+    for entry in entries:
+        target = entry[0].replace("\\", "/")
+        if "/t/images/" in target or target.endswith("/t") or "/html/" in target:
+            continue
+        keep.append(entry)
+    return keep
+
 hiddenimports = [
     "pentimento",
     "pentimento.server",
@@ -66,6 +83,9 @@ a = Analysis(
     ],
     noarchive=False,
 )
+
+a.datas = _drop_exiftool_test_suite(a.datas)
+a.binaries = _drop_exiftool_test_suite(a.binaries)
 
 pyz = PYZ(a.pure)
 

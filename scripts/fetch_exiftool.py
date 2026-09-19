@@ -49,6 +49,24 @@ def _fetch(url: str) -> bytes:
         return response.read()
 
 
+# Directories in the generic distribution that are not needed to run
+# ExifTool. `t/` is its own test suite, and it is not merely dead weight:
+# t/images holds deliberately malformed files, including a Mach-O with no
+# load commands. PyInstaller recognises the magic number, tries to process
+# it as a real binary, and fails the entire macOS build.
+_PRUNE = ("t", "html")
+
+
+def _prune(root: Path) -> int:
+    removed = 0
+    for name in _PRUNE:
+        target = root / name
+        if target.is_dir():
+            removed += sum(1 for _ in target.rglob("*") if _.is_file())
+            shutil.rmtree(target, ignore_errors=True)
+    return removed
+
+
 def download() -> Path:
     """Download and extract ExifTool. Returns the binary path."""
     VENDOR_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,6 +84,7 @@ def download() -> Path:
             script = extracted / "exiftool"
             if script.is_file():
                 script.chmod(0o755)
+            _prune(extracted)
     else:
         raise RuntimeError(
             f"Expected an archive, got {len(blob)} bytes starting {blob[:16]!r}"

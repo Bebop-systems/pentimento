@@ -47,3 +47,30 @@ def test_find_exiftool_locates_binary(tmp_path, monkeypatch):
 
     monkeypatch.setattr(fx, "VENDOR_DIR", tmp_path)
     assert find_exiftool() == binary
+
+
+def test_the_test_suite_is_pruned(tmp_path):
+    """ExifTool's own t/ directory must not reach a bundle.
+
+    t/images holds deliberately malformed files for ExifTool to parse,
+    including a Mach-O with no load commands. PyInstaller recognises the
+    magic number, tries to process it as a real binary and fails the whole
+    macOS build. It is also several megabytes nobody needs at runtime.
+    """
+    import scripts.fetch_exiftool as fx
+
+    root = tmp_path / f"Image-ExifTool-{EXIFTOOL_VERSION}"
+    (root / "t" / "images").mkdir(parents=True)
+    (root / "t" / "images" / "EXE.macho").write_bytes(b"\xcf\xfa\xed\xfe")
+    (root / "html").mkdir()
+    (root / "html" / "index.html").write_text("docs", encoding="utf-8")
+    (root / "lib").mkdir()
+    (root / "lib" / "keep.pm").write_text("needed", encoding="utf-8")
+    (root / "exiftool").write_text("#!/usr/bin/perl", encoding="utf-8")
+
+    fx._prune(root)
+
+    assert not (root / "t").exists()
+    assert not (root / "html").exists()
+    assert (root / "lib" / "keep.pm").is_file(), "pruning removed a needed file"
+    assert (root / "exiftool").is_file()
