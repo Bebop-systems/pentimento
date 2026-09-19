@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from anonymizer.paths import PROJECT_ROOT
+from pentimento.paths import PROJECT_ROOT
 
 DESKTOP = PROJECT_ROOT / "desktop"
-SPEC = DESKTOP / "MetadataEditor.spec"
+SPEC = DESKTOP / "Pentimento.spec"
 
 
 def test_spec_exists():

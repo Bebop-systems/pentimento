@@ -146,6 +146,8 @@ if __name__ == "__main__":
     ico = build_ico(here / "icon.ico")
     png = build_png(here / "icon.png")
     icns = build_icns(here / "icon.icns")
-    for produced in (ico, png, icns):
+    # Intune's app logo field wants a square PNG, 256x256, under 1 MB.
+    intune = build_png(here / "icon-intune-256.png", 256)
+    for produced in (ico, png, icns, intune):
         print(f"{produced}  ({produced.stat().st_size} bytes)")
     sys.exit(0)

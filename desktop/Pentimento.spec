@@ -1,11 +1,18 @@
-# PyInstaller spec for Metadata Editor.
+# PyInstaller spec for Pentimento.
 #
-# One folder, not one file. ExifTool ships as 500-odd Perl files; a
-# single-file build would unpack all of them to a temp directory on every
-# launch, which is slow and pointless when the folder can just sit there.
+# Two shapes, chosen by PENTIMENTO_ONEFILE:
+#
+#   onefile  a single self-contained Pentimento.exe. Everything, including
+#            508 ExifTool files, is unpacked to a temp directory on each
+#            launch, so it starts slower but is one file to hand someone.
+#   onedir   an exe beside an _internal folder. Starts immediately.
+#
+# macOS always uses the directory form, because a .app is a directory by
+# definition and Finder already presents it as a single item.
 #
 # No browser is bundled. The window is drawn by Edge WebView2 on Windows
 # and WKWebView on macOS, both of which are operating system components.
+import os
 import sys
 from pathlib import Path
 
@@ -17,15 +24,18 @@ sys.path.insert(0, str(ROOT / "src"))
 WINDOWS = sys.platform.startswith("win")
 MACOS = sys.platform == "darwin"
 
+# A .app is already a bundle, so onefile would only hide it inside one.
+ONEFILE = os.environ.get("PENTIMENTO_ONEFILE") == "1" and not MACOS
+
 datas = [
     (str(ROOT / "web"), "web"),
     (str(ROOT / "vendor"), "vendor"),
 ]
 
 hiddenimports = [
-    "anonymizer",
-    "anonymizer.server",
-    "anonymizer.engine",
+    "pentimento",
+    "pentimento.server",
+    "pentimento.engine",
     "flask",
     "werkzeug.serving",
     "jinja2",
@@ -59,12 +69,14 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name="MetadataEditor",
+# Written by desktop/version_info.py from pentimento.version, so the
+# binary's Properties dialog and any file-version detection rule agree
+# with the single source.
+VERSION_RES = SPEC_DIR / "version_info.txt"
+
+common = dict(
+    name="Pentimento",
+    version=str(VERSION_RES) if WINDOWS and VERSION_RES.is_file() else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -74,21 +86,22 @@ exe = EXE(
     icon=str(SPEC_DIR / "icon.ico") if WINDOWS else None,
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=False,
-    name="MetadataEditor",
-)
+if ONEFILE:
+    # Everything lives inside the executable and is unpacked at launch.
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, [],
+              runtime_tmpdir=None, **common)
+    coll = exe
+else:
+    exe = EXE(pyz, a.scripts, [], exclude_binaries=True, **common)
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False,
+                   name="Pentimento")
 
 if MACOS:
     app = BUNDLE(
         coll,
-        name="Metadata Editor.app",
+        name="Pentimento.app",
         icon=str(SPEC_DIR / "icon.icns"),
-        bundle_identifier="me.adamcho.metadataeditor",
+        bundle_identifier="systems.bebop.pentimento",
         info_plist={
             "CFBundleShortVersionString": "1.0.0",
             "NSHighResolutionCapable": True,

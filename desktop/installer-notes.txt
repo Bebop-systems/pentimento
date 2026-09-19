@@ -1,0 +1,21 @@
+Pentimento 0.1.0
+
+What this installs
+  A local application for inspecting and rewriting photo metadata.
+  Everything runs on this machine. There is no account, no telemetry,
+  and no network connection after installation.
+
+Where things go
+  Program files      the folder you choose below
+  Cleaned photos     your Pictures folder, under "Pentimento"
+  Working files      a temporary folder, deleted when the app closes
+
+Your original photos are never modified. Every cleaned copy is written
+as a new file and checked four ways before you are offered it.
+
+This build is not code signed, so Windows may warn on first run.
+Choose More info, then Run anyway. Signing is planned.
+
+Included software
+  ExifTool by Phil Harvey, under the Artistic Licence or GPL v1+.
+  Its full licence is installed alongside the application.
