@@ -106,6 +106,11 @@ Filename: "{app}\{#AppExe}"; Description: "Start {#AppName}"; \
 ; removing one side-by-side install cannot touch the other.
 Type: filesandordirs; Name: "{app}\_internal"
 Type: files; Name: "{app}\*.txt"
+; WebView2 writes a browser profile beside the executable the first time
+; the window opens - Pentimento.exe.WebView2 - which the installer never
+; placed and so would never remove. Left behind it keeps {app} non-empty,
+; which is what stopped the folder going in the first place.
+Type: filesandordirs; Name: "{app}\*.WebView2"
 Type: dirifempty; Name: "{app}"
 
 ; The session scratch folder, if the app was ever killed before it tidied.

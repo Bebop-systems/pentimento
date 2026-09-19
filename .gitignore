@@ -42,3 +42,7 @@ output/
 dist/
 build/
 *.spec.bak
+
+# Rust build output, and the WebView2 profile wry writes beside the exe
+rust/target/
+*.WebView2/

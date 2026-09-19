@@ -330,3 +330,12 @@ def test_the_build_stamps_the_icons_it_regenerates():
     for produced in ("build_ico", "build_png", "build_icns",
                      "build_wizard_images"):
         assert produced in icons
+
+
+def test_uninstall_removes_the_webview_profile():
+    """WebView2 writes a browser profile beside the executable the first
+    time the window opens. The installer never placed it, so it would
+    never remove it - and left behind it keeps {app} non-empty, which is
+    exactly what stopped the folder going."""
+    text = INSTALLER.read_text(encoding="utf-8")
+    assert r'Name: "{app}\*.WebView2"' in text
