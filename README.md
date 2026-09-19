@@ -27,7 +27,7 @@ remove any of it — with proof that the image itself never changed.
 
 ### One machine
 
-Download **`Pentimento-0.1.0-windows-setup.exe`** from
+Download the **`...-windows-setup.exe`** from
 [Releases](https://github.com/Bebop-systems/pentimento/releases/latest) and run
 it. Pentimento appears in the Start menu. It installs per user, so there is no
 administrator prompt, and it uninstalls from Add or Remove Programs.
@@ -37,7 +37,7 @@ anywhere, including a USB stick.
 
 Nothing else to install: no Python, no ExifTool, no account. Windows warns that
 the app is unsigned the first time — **More info → Run anyway** — because
-signing certificates cost money and this is version 0.1.0.
+signing certificates cost money and this project is young.
 
 ### A fleet
 
@@ -54,14 +54,15 @@ The short version, for an administrator skimming:
 | | |
 |---|---|
 | App type | **Windows app (Win32)** — Intune's line-of-business type does not accept an `.exe` |
-| Install | `Pentimento-0.1.0-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /CURRENTUSER` |
-| Detection | `HKCU` uninstall key `{7B2F5A64-9C3E-4D18-9A6F-2E5C1D0B7A43}_is1`, `DisplayVersion` at or above `0.1.0` |
+| Install | `Pentimento-<version>-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /CURRENTUSER` |
+| Detection | `HKCU` uninstall key `{7B2F5A64-9C3E-4D18-9A6F-2E5C1D0B7A43}_is1`, `DisplayVersion` at or above the deployed version |
 | Network | None. No update check, no telemetry. |
 | Elevation | None required. |
 | Logo | `desktop/icon-intune-256.png` |
 
-> **macOS:** the build is written and produces a proper `.app`, but it has not
-> yet been run on a Mac. See [macOS](#macos) below.
+> **macOS:** a `.app` is built and published by the same pipeline that tests
+> it, and the full suite passes on macOS in CI. It has not yet been launched on
+> real hardware. See [macOS](#macos) below.
 
 ## What it looks like
 
@@ -258,9 +259,17 @@ detail in [docs/PACKAGING.md](docs/PACKAGING.md).
 
 ## macOS
 
-The spec produces a `.app` with a generated `.icns`, written directly so the
-build does not need `iconutil` and therefore does not need a Mac. It has not
-been run on one.
+The full test suite runs on macOS in CI and passes, and every release builds a
+`.app` there with a generated `.icns` — written directly, so the build needs
+neither `iconutil` nor a Mac.
+
+What remains unverified is the last step: nobody has double-clicked the bundle
+on real hardware. Download `Pentimento-*-macos.zip` from the release, unzip,
+and because it is unsigned, clear the quarantine flag first:
+
+```bash
+xattr -dr com.apple.quarantine "Pentimento.app"
+```
 
 The specific risk is Perl. Windows gets the ExifTool standalone build with its
 own Perl; everything else gets the plain distribution, which relies on the

@@ -3,8 +3,9 @@
 For administrators. Everyday users want the
 [README](../README.md); nothing here is needed to run the application.
 
-Every value below was read back from a real install rather than written
-from memory.
+Every value below was read back from a real install rather than written from
+memory. Commands show a concrete version for copy-and-paste; substitute
+whichever one you downloaded.
 
 ## What the application does on an endpoint
 
@@ -115,40 +116,6 @@ behavior to **System**, and point the uninstall command at
 **Assignments** — a user group for a per-user install, a device group for
 `/ALLUSERS`. *Available for enrolled devices* suits a tool people opt into;
 *Required* if it is standard issue.
-
-### The commands, on their own
-
-### Install command
-
-Per user, which is the default and needs no elevation:
-
-```
-Pentimento-0.1.0-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /CURRENTUSER
-```
-
-Per machine, if you would rather install once for everyone. Requires the
-package to run in system context:
-
-```
-Pentimento-0.1.0-windows-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /ALLUSERS
-```
-
-### Uninstall command
-
-```
-"%LOCALAPPDATA%\Programs\Pentimento\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-```
-
-For a machine-wide install the uninstaller sits under `%ProgramFiles%\Pentimento`
-instead. Both paths are recorded in `UninstallString` on the registry key below.
-
-### Install behaviour
-
-| Setting | Value |
-|---|---|
-| Install behaviour | **User** for `/CURRENTUSER`, **System** for `/ALLUSERS` |
-| Device restart behaviour | No specific action |
-| Return codes | `0` success, `1602` user cancelled, `1603` failure, `3010` soft reboot |
 
 ## Detection rules
 

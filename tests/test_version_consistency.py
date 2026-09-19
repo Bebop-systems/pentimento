@@ -96,3 +96,11 @@ def test_the_imported_version_matches_the_file_on_disk():
         f"version.py says {on_disk} but imports as {__version__}: stale "
         f"bytecode. Delete __pycache__ directories."
     )
+
+
+def test_the_readme_does_not_pin_a_version():
+    """Install instructions naming a specific build go stale on the next
+    release, and nobody remembers to edit prose."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    pinned = re.findall(r"Pentimento-\d+\.\d+\.\d+-", readme)
+    assert not pinned, f"README pins a version: {set(pinned)}"

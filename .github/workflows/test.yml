@@ -10,8 +10,9 @@ jobs:
   test:
     name: ${{ matrix.os }} / py${{ matrix.python }}
     runs-on: ${{ matrix.os }}
-    # macOS is written but unverified, so it reports without blocking.
-    continue-on-error: ${{ matrix.os == 'macos-latest' }}
+    # macOS blocks like Windows does. It earned that on its first run by
+    # catching two real bugs, and passing now means a regression there is
+    # a regression worth stopping for.
     strategy:
       fail-fast: false
       matrix:

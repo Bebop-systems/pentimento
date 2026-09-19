@@ -8,7 +8,7 @@ a link, in their own browser, when they choose to.
 """
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 REPO_URL = "https://github.com/Bebop-systems/pentimento"
 RELEASES_URL = f"{REPO_URL}/releases/latest"

@@ -4,6 +4,31 @@ All notable changes to this project are recorded here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-09-19
+
+macOS is now built and tested in CI rather than written and hoped for.
+
+### Added
+
+- A macOS `.app` is produced and published alongside the Windows build.
+  It is still unrun on real hardware, but it is now built by the same
+  pipeline that tests it.
+- macOS is a blocking CI job rather than an advisory one.
+
+### Fixed
+
+- `start_new_session=True` on POSIX did the opposite of its intent: it
+  detached the ExifTool child into its own session so it survived the
+  parent entirely. Caught by macOS CI on its first run.
+- Orphaned ExifTool processes are now reaped by the next run. `-stay_open`
+  is documented to keep reading past end of file, so closing stdin never
+  stopped it, and no POSIX mechanism can guarantee otherwise. Preventing
+  accumulation is the achievable goal, and accumulation was the real harm.
+- `test_find_exiftool_locates_binary` assumed a Windows layout; the
+  archives genuinely differ per platform.
+- The test suite no longer requires build tooling to be installed, which
+  had made the tests workflow fail on a fresh checkout.
+
 ## [0.1.0] — 2026-09-19
 
 First public release. Windows is supported; macOS is written but unverified.
