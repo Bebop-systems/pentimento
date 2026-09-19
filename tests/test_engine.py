@@ -1,6 +1,9 @@
+import os
+from pathlib import Path
+
 import pytest
 
-from anonymizer.engine import ExifToolError
+from pentimento.engine import ExifToolError
 
 
 def test_version(engine):
@@ -63,7 +66,7 @@ def test_concurrent_commands_do_not_interleave(exiftool_path):
     """
     import concurrent.futures
 
-    from anonymizer.engine import ExifToolEngine
+    from pentimento.engine import ExifToolEngine
 
     with ExifToolEngine(exiftool_path) as engine:
         def ask(_):
@@ -79,7 +82,7 @@ def test_concurrent_reads_return_their_own_file(exiftool_path, tmp_path):
     """Each thread must get its own file's metadata, not another's."""
     import concurrent.futures
 
-    from anonymizer.engine import ExifToolEngine
+    from pentimento.engine import ExifToolEngine
     from tests.conftest import MINIMAL_JPEG
 
     with ExifToolEngine(exiftool_path) as engine:
@@ -102,7 +105,7 @@ def test_concurrent_reads_return_their_own_file(exiftool_path, tmp_path):
 
 def test_engine_restarts_after_the_process_is_killed(exiftool_path):
     """A dead ExifTool must not break every later request."""
-    from anonymizer.engine import ExifToolEngine
+    from pentimento.engine import ExifToolEngine
 
     with ExifToolEngine(exiftool_path) as engine:
         assert engine.execute("-ver").stdout.strip() == "13.59"
@@ -112,3 +115,61 @@ def test_engine_restarts_after_the_process_is_killed(exiftool_path):
 
         assert engine.execute("-ver").stdout.strip() == "13.59"
         assert engine.restarts == 1
+
+
+def test_a_hard_kill_does_not_orphan_exiftool(exiftool_path):
+    """Nothing in Python runs when a process is killed outright.
+
+    Without an OS-level guarantee the ExifTool child is simply orphaned,
+    and they accumulate: fifteen turned up during one afternoon of manual
+    testing. On Windows a Job Object makes the kernel clean up for us.
+    """
+    import subprocess
+    import sys
+    import textwrap
+    import time
+
+    from pentimento.engine import ExifToolEngine
+
+    script = textwrap.dedent(f"""
+        import sys, time
+        sys.path[:0] = [r"{Path.cwd()}", r"{Path.cwd() / 'src'}"]
+        from pentimento.engine import ExifToolEngine
+        engine = ExifToolEngine(r"{exiftool_path}").start()
+        engine.execute("-ver")
+        print(engine._proc.pid, flush=True)
+        time.sleep(60)
+    """)
+    child = subprocess.Popen([sys.executable, "-c", script],
+                             stdout=subprocess.PIPE, text=True)
+    try:
+        exiftool_pid = int(child.stdout.readline().strip())
+        child.kill()          # no cleanup code can possibly run
+        child.wait(timeout=10)
+
+        for _ in range(50):
+            if not _pid_alive(exiftool_pid):
+                break
+            time.sleep(0.1)
+        assert not _pid_alive(exiftool_pid), (
+            f"exiftool {exiftool_pid} survived its parent being killed"
+        )
+    finally:
+        child.stdout.close()
+        if child.poll() is None:
+            child.kill()
+
+
+def _pid_alive(pid: int) -> bool:
+    import subprocess
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+    out = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+        capture_output=True, text=True,
+    ).stdout
+    return str(pid) in out
